@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Background gradient: dark navy -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#0f1c2e"/>
+      <stop offset="100%" stop-color="#17253d"/>
+    </linearGradient>
+    <!-- Highlighted row gradient -->
+    <linearGradient id="hl" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#0a3d6b"/>
+      <stop offset="100%" stop-color="#0e639c"/>
+    </linearGradient>
+    <!-- Subtle glow on highlighted row text -->
+    <filter id="glow" x="-10%" y="-20%" width="120%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Clip to rounded corners -->
+    <clipPath id="clip">
+      <rect width="1024" height="1024" rx="225"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="225" fill="url(#bg)"/>
+
+  <g clip-path="url(#clip)">
+
+    <!-- ── Title bar ─────────────────────────────────────── -->
+    <rect x="0" y="0" width="1024" height="116" fill="#090f1a"/>
+    <text x="512" y="80"
+          font-family="Courier New, Courier, monospace"
+          font-size="56" font-weight="bold" letter-spacing="10"
+          text-anchor="middle" fill="#4fc3f7">HEX EDITOR</text>
+    <line x1="0" y1="116" x2="1024" y2="116" stroke="#1a3a5c" stroke-width="3"/>
+
+    <!-- ── Column-header bar ──────────────────────────────── -->
+    <rect x="0" y="116" width="1024" height="74" fill="#0d1825"/>
+    <text x="78"  y="166" font-family="Courier New, Courier, monospace" font-size="36" fill="#2c5580">00000000</text>
+    <text x="390" y="166" font-family="Courier New, Courier, monospace" font-size="36" fill="#2c5580">+0  +1  +2  +3</text>
+    <text x="790" y="166" font-family="Courier New, Courier, monospace" font-size="36" fill="#2c5580">Text</text>
+    <line x1="0" y1="190" x2="1024" y2="190" stroke="#1a3a5c" stroke-width="2"/>
+
+    <!-- ── Vertical column separators ────────────────────── -->
+    <line x1="364" y1="116" x2="364" y2="1024" stroke="#1a3a5c" stroke-width="2.5"/>
+    <line x1="758" y1="116" x2="758" y2="1024" stroke="#1a3a5c" stroke-width="2.5"/>
+
+    <!-- ── Row 1 (odd) ───────────────────────────────────── -->
+    <rect x="0" y="190" width="1024" height="86" fill="rgba(0,0,0,0.12)"/>
+    <text x="78"  y="249" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00000FF0</text>
+    <text x="390" y="249" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">5C A1 3F B2</text>
+    <text x="778" y="249" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">\.?.</text>
+
+    <!-- ── Row 2 (even) ──────────────────────────────────── -->
+    <text x="78"  y="335" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00000FF4</text>
+    <text x="390" y="335" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">D4 0A F3 7E</text>
+    <text x="778" y="335" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">...~</text>
+
+    <!-- ── Row 3 HIGHLIGHTED — "HEX!" ───────────────────── -->
+    <rect x="0" y="362" width="1024" height="86" fill="url(#hl)"/>
+    <!-- Subtle glow behind the highlighted row -->
+    <rect x="0" y="362" width="1024" height="86" fill="#1177bb" opacity="0.15"/>
+    <text x="78"  y="421" font-family="Courier New, Courier, monospace" font-size="46" fill="#90c8f0" filter="url(#glow)">00001000</text>
+    <text x="390" y="421" font-family="Courier New, Courier, monospace" font-size="46" fill="#ffffff"  filter="url(#glow)">48 45 58 21</text>
+    <text x="778" y="421" font-family="Courier New, Courier, monospace" font-size="46" fill="#7ddff0" filter="url(#glow)">HEX!</text>
+
+    <!-- ── Row 4 (odd) ───────────────────────────────────── -->
+    <rect x="0" y="448" width="1024" height="86" fill="rgba(0,0,0,0.12)"/>
+    <text x="78"  y="507" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00001004</text>
+    <text x="390" y="507" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">C3 0F 6D 82</text>
+    <text x="778" y="507" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">..m.</text>
+
+    <!-- ── Row 5 (even) ──────────────────────────────────── -->
+    <text x="78"  y="593" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00001008</text>
+    <text x="390" y="593" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">F9 2B 4A 17</text>
+    <text x="778" y="593" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">.+J.</text>
+
+    <!-- ── Row 6 (odd) ───────────────────────────────────── -->
+    <rect x="0" y="620" width="1024" height="86" fill="rgba(0,0,0,0.12)"/>
+    <text x="78"  y="679" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">0000100C</text>
+    <text x="390" y="679" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">8E D2 36 5A</text>
+    <text x="778" y="679" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">..6Z</text>
+
+    <!-- ── Row 7 (even) ──────────────────────────────────── -->
+    <text x="78"  y="765" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00001010</text>
+    <text x="390" y="765" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">1B 6C 92 E8</text>
+    <text x="778" y="765" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">.l..</text>
+
+    <!-- ── Row 8 (odd) ───────────────────────────────────── -->
+    <rect x="0" y="792" width="1024" height="86" fill="rgba(0,0,0,0.12)"/>
+    <text x="78"  y="851" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a8a">00001014</text>
+    <text x="390" y="851" font-family="Courier New, Courier, monospace" font-size="46" fill="#4a7a9a">7A 3C B5 0D</text>
+    <text x="778" y="851" font-family="Courier New, Courier, monospace" font-size="46" fill="#2a5a6a">z&lt;..</text>
+
+    <!-- ── Status bar ─────────────────────────────────────── -->
+    <rect x="0" y="940" width="1024" height="84" fill="#07111e"/>
+    <line x1="0" y1="940" x2="1024" y2="940" stroke="#1a3a5c" stroke-width="2"/>
+    <text x="78" y="992"
+          font-family="Courier New, Courier, monospace"
+          font-size="36" fill="#4fc3f7">▶  00001000  ·  HEX!  ·  4 bytes</text>
+
+  </g>
+</svg>

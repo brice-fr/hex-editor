@@ -1,12 +1,16 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- SPDX-FileCopyrightText: 2026 Brice LECOLE -->
+
 <script>
-  let { onOpen = () => {}, loading = false, status = '' } = $props();
+  let { onOpen = () => {}, onSave = () => {}, onFind = () => {}, onGoto = () => {}, loading = false, saving = false, hasFile = false } = $props();
 </script>
 
 <div class="toolbar">
+  <!-- Open button -->
   <button
     class="icon-btn"
     onclick={() => onOpen()}
-    disabled={loading}
+    disabled={loading || saving}
     title="Open file… (⌘O)"
     aria-label="Open file"
   >
@@ -25,11 +29,62 @@
     {/if}
   </button>
 
+  <!-- Save as button -->
+  <button
+    class="icon-btn"
+    onclick={() => onSave()}
+    disabled={loading || saving || !hasFile}
+    title="Save as… (⌘⇧S)"
+    aria-label="Save file as"
+  >
+    {#if saving}
+      <!-- Spinner -->
+      <svg class="spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+    {:else}
+      <!-- Floppy-disk / save icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+    {/if}
+  </button>
+
   <div class="divider"></div>
 
-  {#if status}
-    <span class="status" class:error={status.startsWith('Error')}>{status}</span>
-  {/if}
+  <!-- Find button -->
+  <button
+    class="icon-btn"
+    onclick={() => onFind()}
+    disabled={!hasFile}
+    title="Find… (⌘F)"
+    aria-label="Find"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+    </svg>
+  </button>
+
+  <!-- Go to address button -->
+  <button
+    class="icon-btn"
+    onclick={() => onGoto()}
+    disabled={!hasFile}
+    title="Go to address… (⌘G)"
+    aria-label="Go to address"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Downward arrow -->
+      <line x1="12" y1="3" x2="12" y2="15"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <!-- Target line -->
+      <line x1="3" y1="20" x2="21" y2="20"/>
+    </svg>
+  </button>
 </div>
 
 <style>
@@ -92,24 +147,10 @@
     margin: 0 4px;
   }
 
-  .status {
-    font-size: 12px;
-    color: #9cdcfe;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .status.error {
-    color: #f44747;
-  }
-
   @media (prefers-color-scheme: light) {
-    .toolbar        { background: #f3f3f3; border-bottom-color: #ddd; }
-    .icon-btn       { color: #424242; }
+    .toolbar  { background: #f3f3f3; border-bottom-color: #ddd; }
+    .icon-btn { color: #424242; }
     .icon-btn:hover:not(:disabled) { background: #e0e0e0; color: #1e1e1e; }
-    .divider        { background: #ddd; }
-    .status         { color: #0070c1; }
-    .status.error   { color: #cd3131; }
+    .divider  { background: #ddd; }
   }
 </style>

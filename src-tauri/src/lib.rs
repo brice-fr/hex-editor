@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Brice LECOLE
+
 pub mod commands;
 pub mod file_operations;
 pub mod hex_parser;
@@ -13,6 +16,7 @@ pub fn run() {
             commands::parse_intel_hex,
             commands::parse_srec,
             commands::detect_file_format,
+            commands::save_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

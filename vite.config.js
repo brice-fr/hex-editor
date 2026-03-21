@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Brice LECOLE
+
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 
@@ -7,6 +10,14 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [sveltekit()],
+
+  define: {
+    // Expose package.json version as import.meta.env.VITE_APP_VERSION
+    // @ts-expect-error process is a nodejs global
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(
+      process.env.npm_package_version ?? '0.1.0'
+    ),
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

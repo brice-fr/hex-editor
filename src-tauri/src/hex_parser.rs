@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Brice LECOLE
+
 use ihex::Record;
 
 /// Parsed representation of an Intel HEX file.

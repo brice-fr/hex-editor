@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Brice LECOLE
+
 /// Parsed representation of a Motorola S-record file.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct SrecFile {
@@ -86,6 +89,9 @@ pub fn parse(raw: &str) -> Result<SrecFile, String> {
                 let data = addr_data_chk[4..addr_data_chk.len() - 1].to_vec();
                 (addr, data)
             }
+            // S6 carries a 3-byte record count and is not part of the official
+            // standard, but many tools emit it. Silently skip it.
+            "S6" => continue,
             other => return Err(format!("line {}: unknown record type: {other}", line_num + 1)),
         };
 

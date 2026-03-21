@@ -1,4 +1,7 @@
-use crate::{file_operations, hex_parser, srec_parser};
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2026 Brice LECOLE
+
+use crate::{file_operations::{self, RecordData}, hex_parser, srec_parser};
 
 /// Read a file from the filesystem and return its raw bytes.
 ///
@@ -32,4 +35,19 @@ pub fn parse_srec(data: Vec<u8>) -> Result<String, String> {
 #[tauri::command]
 pub fn detect_file_format(path: String) -> String {
     file_operations::detect_format(&path)
+}
+
+/// Serialise the current records to the requested format and write them to disk.
+///
+/// `format` must be `"ihex"` or `"srec"` (case-insensitive).
+/// Only "Data" records in the input are written; all metadata records
+/// (ExtendedLinearAddress, S0 header, etc.) are regenerated automatically.
+#[tauri::command]
+pub fn save_file(records: Vec<RecordData>, path: String, format: String) -> Result<(), String> {
+    let content = match format.to_lowercase().as_str() {
+        "ihex" => file_operations::write_ihex(&records),
+        "srec" => file_operations::write_srec(&records),
+        other  => return Err(format!("Unsupported format '{other}'. Use 'ihex' or 'srec'.")),
+    };
+    file_operations::write_file(&path, content.as_bytes())
 }
