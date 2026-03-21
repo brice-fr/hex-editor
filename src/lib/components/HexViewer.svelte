@@ -34,13 +34,33 @@
   const visibleRows = $derived(rows.slice(startIdx, endIdx));
   const offsetTop   = $derived(startIdx * ROW_HEIGHT);
 
-  let scrollEl          = $state(null);
-  let suppressScrolled  = false;
+  let scrollEl         = $state(null);
+  let suppressScrolled = false;
+
+  // Throttle state — plain vars, not reactive (no re-render needed)
+  const SCROLL_THROTTLE_MS = 50;
+  let rawScrollTop = 0;   // latest position from every scroll event
+  let throttleId   = null;
+
+  function commitScroll() {
+    if (scrollTop !== rawScrollTop) scrollTop = rawScrollTop;
+    throttleId = null;
+  }
 
   function onScroll(e) {
-    scrollTop = e.currentTarget.scrollTop;
+    rawScrollTop = e.currentTarget.scrollTop;
     if (!suppressScrolled) onScrolled(); // user-initiated only
+
+    if (throttleId === null) {
+      // Leading edge: apply immediately, schedule a trailing catch-up
+      scrollTop  = rawScrollTop;
+      throttleId = setTimeout(commitScroll, SCROLL_THROTTLE_MS);
+    }
+    // Intermediate events: rawScrollTop advances; commitScroll will flush it
   }
+
+  // Clean up any pending timer when the component is destroyed
+  $effect(() => () => { if (throttleId !== null) clearTimeout(throttleId); });
 
   // Keep parent's top-address in sync (fires on mount, file load, scroll, and navigation)
   $effect(() => {
@@ -55,9 +75,12 @@
     );
     if (rowIdx >= 0) {
       const newTop = rowIdx * ROW_HEIGHT;
+      // Cancel any pending throttle so it can't overwrite the navigation jump
+      if (throttleId !== null) { clearTimeout(throttleId); throttleId = null; }
+      rawScrollTop     = newTop;
       suppressScrolled = true;
       scrollEl.scrollTop = newTop;
-      scrollTop = newTop;
+      scrollTop          = newTop;
       // Re-enable after the scroll event has fired
       requestAnimationFrame(() => { suppressScrolled = false; });
     }
