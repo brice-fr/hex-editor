@@ -8,19 +8,72 @@
    *
    * Props
    *   open     – controls visibility
-   *   onPick   – called with "ihex" | "srec" when the user confirms
+   *   onPick   – called with { fmt, fillByte? } when the user confirms:
+   *                { fmt: 'ihex' }
+   *                { fmt: 'srec' }
+   *                { fmt: 'binary', fillByte: number }
    *   onCancel – called when the user dismisses without choosing
    */
-  let { open = false, onPick = (_fmt) => {}, onCancel = () => {} } = $props();
+  let { open = false, onPick = (_choice) => {}, onCancel = () => {} } = $props();
 
-  function pick(fmt) { onPick(fmt); }
+  // 'format-select' | 'binary-config'
+  let view     = $state('format-select');
+  let fillHex  = $state('FF');
+  let fillError = $state('');
+
+  // Decimal preview of the fill byte
+  const fillDecimal = $derived((() => {
+    const v = parseInt(fillHex, 16);
+    return isNaN(v) ? '—' : String(v);
+  })());
+
+  const fillValid = $derived((() => {
+    const v = parseInt(fillHex, 16);
+    return !isNaN(v) && v >= 0 && v <= 255 && /^[0-9a-fA-F]{1,2}$/.test(fillHex.trim());
+  })());
+
+  // Reset view each time dialog opens
+  $effect(() => {
+    if (open) {
+      view     = 'format-select';
+      fillHex  = 'FF';
+      fillError = '';
+    }
+  });
+
+  function pick(fmt) {
+    if (fmt === 'ihex') { onPick({ fmt: 'ihex' }); return; }
+    if (fmt === 'srec') { onPick({ fmt: 'srec' }); return; }
+    if (fmt === 'binary') {
+      view = 'binary-config';
+    }
+  }
+
+  function saveBinary() {
+    if (!fillValid) {
+      fillError = 'Enter a valid hex byte (00–FF).';
+      return;
+    }
+    onPick({ fmt: 'binary', fillByte: parseInt(fillHex, 16) });
+  }
+
+  function handleFillInput(e) {
+    const pos = e.target.selectionStart;
+    fillHex = e.target.value.toUpperCase();
+    fillError = '';
+    setTimeout(() => e.target.setSelectionRange(pos, pos), 0);
+  }
 
   function handleBackdrop(e) {
     if (e.target === e.currentTarget) onCancel();
   }
 
   function handleKey(e) {
-    if (e.key === 'Escape') onCancel();
+    if (e.key === 'Escape') {
+      if (view === 'binary-config') { view = 'format-select'; }
+      else { onCancel(); }
+    }
+    if (e.key === 'Enter' && view === 'binary-config') saveBinary();
   }
 </script>
 
@@ -35,46 +88,104 @@
     onkeydown={handleKey}
   >
     <div class="card">
-      <h2 class="title">Save as…</h2>
-      <p class="subtitle">Choose the output format</p>
+      {#if view === 'format-select'}
+        <h2 class="title">Save as…</h2>
+        <p class="subtitle">Choose the output format</p>
 
-      <div class="options">
-        <button class="fmt-btn" onclick={() => pick('ihex')}>
-          <span class="fmt-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </span>
-          <span class="fmt-body">
-            <span class="fmt-name">Intel HEX</span>
-            <span class="fmt-ext">.hex · .ihex</span>
-          </span>
-        </button>
+        <div class="options">
+          <button class="fmt-btn" onclick={() => pick('ihex')}>
+            <span class="fmt-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </span>
+            <span class="fmt-body">
+              <span class="fmt-name">Intel HEX</span>
+              <span class="fmt-ext">.hex · .ihex</span>
+            </span>
+          </button>
 
-        <button class="fmt-btn" onclick={() => pick('srec')}>
-          <span class="fmt-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-          </span>
-          <span class="fmt-body">
-            <span class="fmt-name">Motorola S-record</span>
-            <span class="fmt-ext">.srec · .mot · .s19</span>
-          </span>
-        </button>
-      </div>
+          <button class="fmt-btn" onclick={() => pick('srec')}>
+            <span class="fmt-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </span>
+            <span class="fmt-body">
+              <span class="fmt-name">Motorola S-record</span>
+              <span class="fmt-ext">.srec · .mot · .s19</span>
+            </span>
+          </button>
 
-      <div class="actions">
-        <button class="btn-cancel" onclick={onCancel}>Cancel</button>
-      </div>
+          <button class="fmt-btn" onclick={() => pick('binary')}>
+            <span class="fmt-icon">
+              <!-- Chip / binary grid icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="7" y="7" width="10" height="10" rx="1"/>
+                <line x1="9"  y1="4" x2="9"  y2="7"/>
+                <line x1="12" y1="4" x2="12" y2="7"/>
+                <line x1="15" y1="4" x2="15" y2="7"/>
+                <line x1="9"  y1="17" x2="9"  y2="20"/>
+                <line x1="12" y1="17" x2="12" y2="20"/>
+                <line x1="15" y1="17" x2="15" y2="20"/>
+                <line x1="4"  y1="9" x2="7"  y2="9"/>
+                <line x1="4"  y1="12" x2="7" y2="12"/>
+                <line x1="4"  y1="15" x2="7" y2="15"/>
+                <line x1="17" y1="9" x2="20" y2="9"/>
+                <line x1="17" y1="12" x2="20" y2="12"/>
+                <line x1="17" y1="15" x2="20" y2="15"/>
+              </svg>
+            </span>
+            <span class="fmt-body">
+              <span class="fmt-name">Binary</span>
+              <span class="fmt-ext">.bin</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="actions">
+          <button class="btn-cancel" onclick={onCancel}>Cancel</button>
+        </div>
+
+      {:else}
+        <!-- Binary config sub-panel -->
+        <h2 class="title">Binary Export Options</h2>
+        <p class="subtitle">Configure the raw binary output</p>
+
+        <label class="field-label" for="fill-byte-input">Fill byte (gaps)</label>
+        <div class="fill-row">
+          <input
+            id="fill-byte-input"
+            class="fill-input"
+            class:invalid={!!fillError}
+            value={fillHex}
+            oninput={handleFillInput}
+            maxlength="2"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="FF"
+          />
+          <span class="fill-decimal">= {fillDecimal}</span>
+        </div>
+
+        {#if fillError}
+          <p class="error-msg">{fillError}</p>
+        {/if}
+
+        <div class="actions">
+          <button class="btn-back" onclick={() => (view = 'format-select')}>Back</button>
+          <button class="btn-ok" disabled={!fillValid} onclick={saveBinary}>Save…</button>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
@@ -184,26 +295,90 @@
     color: #fff;
   }
 
+  /* Binary sub-panel */
+  .field-label {
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 0.02em;
+    margin-top: 8px;
+  }
+
+  .fill-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .fill-input {
+    font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 14px;
+    padding: 7px 10px;
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 5px;
+    color: #9cdcfe;
+    outline: none;
+    width: 60px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: border-color 0.15s;
+  }
+
+  .fill-input:focus { border-color: #007acc; }
+  .fill-input.invalid { border-color: #f44747; }
+
+  .fill-decimal {
+    font-size: 11px;
+    color: #888;
+    font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', monospace;
+    white-space: nowrap;
+  }
+
+  .error-msg {
+    font-size: 11px;
+    color: #f44747;
+    min-height: 14px;
+  }
+
   .actions {
     display: flex;
     justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
   }
 
-  .btn-cancel {
+  .btn-cancel, .btn-back, .btn-ok {
     padding: 5px 16px;
     font-size: 13px;
-    background: transparent;
-    border: 1px solid #555;
     border-radius: 5px;
-    color: #aaa;
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
     font-family: inherit;
+    transition: background 0.1s, color 0.1s;
   }
 
-  .btn-cancel:hover {
+  .btn-cancel, .btn-back {
+    background: transparent;
+    border: 1px solid #555;
+    color: #aaa;
+  }
+
+  .btn-cancel:hover, .btn-back:hover {
     background: #3a3a3a;
     color: #e0e0e0;
+  }
+
+  .btn-ok {
+    background: #0e639c;
+    border: 1px solid transparent;
+    color: #fff;
+  }
+
+  .btn-ok:hover:not(:disabled) { background: #1177bb; }
+
+  .btn-ok:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   @media (prefers-color-scheme: light) {
@@ -215,5 +390,8 @@
     .fmt-ext       { color: #888; }
     .btn-cancel    { border-color: #ccc; color: #555; }
     .btn-cancel:hover { background: #eee; color: #1e1e1e; }
+    .fill-input    { background: #fff; border-color: #ccc; color: #0070c1; }
+    .btn-back      { border-color: #ccc; color: #555; }
+    .btn-back:hover { background: #eee; color: #1e1e1e; }
   }
 </style>

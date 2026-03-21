@@ -2,17 +2,19 @@
 <!-- SPDX-FileCopyrightText: 2026 Brice LECOLE -->
 
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { Menu, Submenu, MenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
   import { open, save, message } from '@tauri-apps/plugin-dialog';
-  import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile } from '$lib/api.js';
+  import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile, saveBinary } from '$lib/api.js';
   import FileMenu from '$lib/components/FileMenu.svelte';
   import HexViewer from '$lib/components/HexViewer.svelte';
   import SaveFormatDialog from '$lib/components/SaveFormatDialog.svelte';
   import GoToDialog  from '$lib/components/GoToDialog.svelte';
   import FindDialog  from '$lib/components/FindDialog.svelte';
   import AboutDialog from '$lib/components/AboutDialog.svelte';
+  import ImportBinaryDialog from '$lib/components/ImportBinaryDialog.svelte';
 
   let records       = $state([]);
   let currentFile   = $state('');
@@ -24,9 +26,14 @@
   let showGoto         = $state(false);
   let showFind         = $state(false);
   let showAbout        = $state(false);
+  let isDragging       = $state(false);
+  let showImportBinary = $state(false);
+  let pendingBinaryPath = $state('');
   let hexTopAddress    = $state(0);        // tracks topmost visible address in HexViewer
   let gotoTarget       = $state(null);     // { addr, seq } — seq ensures reactivity on repeat
   let gotoSeq          = 0;
+
+  let unlistenDragDrop;
 
   // Address range of the loaded file (for GoToDialog validation)
   const addrRange = $derived((() => {
@@ -62,23 +69,22 @@
     status      = `Navigated to 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
   }
 
-  // ── Shared open logic (toolbar icon + native menu item both call this) ──
-  async function handleOpen() {
-    const selected = await open({
-      multiple: false,
-      filters: [
-        { name: 'HEX / S-record files', extensions: ['hex', 'ihex', 'srec', 'mot', 's19', 's28', 's37'] },
-        { name: 'All files', extensions: ['*'] },
-      ],
-    });
-
-    if (!selected) return; // user cancelled
-
+  // ── Shared open logic — called by both dialog and drag-drop ──────────────
+  async function handleOpenPath(path) {
     loading = true;
     status  = 'Loading…';
     try {
-      const format = await detectFileFormat(selected);
-      const bytes  = await openFile(selected);
+      const format = await detectFileFormat(path);
+
+      if (format === 'binary') {
+        // Show the import dialog to ask for base address
+        pendingBinaryPath = path;
+        showImportBinary  = true;
+        loading = false;
+        return;
+      }
+
+      const bytes = await openFile(path);
 
       let parsed;
       if (format === 'ihex') {
@@ -87,15 +93,70 @@
         parsed = JSON.parse(await parseSrec(bytes));
       } else {
         await message(`Unsupported format: ${format}`, { kind: 'error', title: 'Cannot open file' });
+        loading = false;
         return;
       }
 
       records       = parsed.records;
-      currentFile   = selected;
+      currentFile   = path;
       currentFormat = format;
-      const fileName = selected.split('/').at(-1);
+      const fileName = path.split('/').at(-1);
       await getCurrentWindow().setTitle(`Hex Editor — ${fileName}`);
-      status = `Loaded ${parsed.total_data_bytes.toLocaleString()} bytes · ${format.toUpperCase()}`;
+
+      let statusMsg = `Loaded ${parsed.total_data_bytes.toLocaleString()} bytes · ${format.toUpperCase()}`;
+      if (parsed.checksum_warnings > 0) {
+        statusMsg += ` · ⚠ ${parsed.checksum_warnings} checksum error${parsed.checksum_warnings > 1 ? 's' : ''} corrected`;
+      }
+      status = statusMsg;
+    } catch (err) {
+      await message(String(err), { kind: 'error', title: 'Cannot open file' });
+    } finally {
+      loading = false;
+    }
+  }
+
+  // ── Open via file dialog ─────────────────────────────────────────────────
+  async function handleOpen() {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: 'Firmware files', extensions: ['hex', 'ihex', 'srec', 'mot', 's19', 's28', 's37', 'bin'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+
+    if (!selected) return; // user cancelled
+    await handleOpenPath(selected);
+  }
+
+  // ── Import Binary — opens dialog filtered to .bin only ───────────────────
+  async function handleImportBinaryOpen() {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: 'Binary files', extensions: ['bin'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (!selected) return;
+    await handleOpenPath(selected);
+  }
+
+  // ── Called when user confirms the import binary dialog ───────────────────
+  async function handleImportBinary(baseAddr) {
+    showImportBinary = false;
+    const path = pendingBinaryPath;
+    pendingBinaryPath = '';
+    loading = true;
+    status  = 'Loading…';
+    try {
+      const bytes = await openFile(path);
+      records       = [{ record_type: 'Data', address: baseAddr, data: bytes }];
+      currentFile   = path;
+      currentFormat = 'binary';
+      const fileName = path.split('/').at(-1);
+      await getCurrentWindow().setTitle(`Hex Editor — ${fileName}`);
+      status = `Loaded ${bytes.length.toLocaleString()} bytes · Binary @ 0x${baseAddr.toString(16).toUpperCase().padStart(8, '0')}`;
     } catch (err) {
       await message(String(err), { kind: 'error', title: 'Cannot open file' });
     } finally {
@@ -109,17 +170,39 @@
   }
 
   // ── Save as — step 2: format chosen → open native file-save dialog ───────
-  async function handleFormatPicked(fmt) {
+  async function handleFormatPicked({ fmt, fillByte = 0xFF }) {
     showFormatPicker = false;
+
+    const stem = currentFile
+      ? currentFile.replace(/\.[^/.]+$/, '')   // strip original extension
+      : 'output';
+
+    if (fmt === 'binary') {
+      const dest = await save({
+        filters: [{ name: 'Binary', extensions: ['bin'] }],
+        defaultPath: stem + '.bin',
+      });
+      if (!dest) return;
+
+      saving = true;
+      status  = 'Saving…';
+      try {
+        const sizeBytes = await saveBinary(records, dest, fillByte);
+        const name = dest.split('/').at(-1);
+        status = `Saved ${name} · Binary (fill=0x${fillByte.toString(16).toUpperCase().padStart(2, '0')}) · ${(sizeBytes / 1024).toFixed(1)} KB`;
+      } catch (err) {
+        await message(String(err), { kind: 'error', title: 'Cannot save file' });
+      } finally {
+        saving = false;
+      }
+      return;
+    }
 
     const filters = fmt === 'ihex'
       ? [{ name: 'Intel HEX',         extensions: ['hex', 'ihex'] }]
       : [{ name: 'Motorola S-record', extensions: ['srec', 'mot', 's19', 's28', 's37'] }];
 
     const defaultExt = fmt === 'ihex' ? '.hex' : '.srec';
-    const stem = currentFile
-      ? currentFile.replace(/\.[^/.]+$/, '')   // strip original extension
-      : 'output';
 
     const dest = await save({ filters, defaultPath: stem + defaultExt });
     if (!dest) return; // user cancelled
@@ -180,6 +263,12 @@
                 accelerator: 'CmdOrCtrl+Shift+S',
                 action: handleSave,
               }),
+              await MenuItem.new({
+                id: 'import-binary',
+                text: 'Import Binary…',
+                accelerator: 'CmdOrCtrl+B',
+                action: handleImportBinaryOpen,
+              }),
               await PredefinedMenuItem.new({ item: 'Separator' }),
               await PredefinedMenuItem.new({ item: 'CloseWindow' }),
             ],
@@ -231,6 +320,29 @@
       // Non-fatal: native menu is best-effort
       console.warn('Could not build native menu:', err);
     }
+
+    // ── Drag-and-drop support ──
+    try {
+      unlistenDragDrop = await getCurrentWebview().onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          isDragging = false;
+          const paths = event.payload.paths;
+          if (paths.length > 0) handleOpenPath(paths[0]);
+        } else if (event.payload.type === 'enter') {
+          isDragging = true;
+        } else if (event.payload.type === 'leave') {
+          isDragging = false;
+        }
+      });
+      document.addEventListener('dragover', (e) => e.preventDefault(), { passive: false });
+      document.addEventListener('drop', (e) => e.preventDefault(), { passive: false });
+    } catch (e) {
+      console.warn('Drag-drop setup failed:', e);
+    }
+  });
+
+  onDestroy(() => {
+    if (unlistenDragDrop) unlistenDragDrop();
   });
 </script>
 
@@ -259,6 +371,28 @@
   onCancel={() => (showFormatPicker = false)}
 />
 
+<ImportBinaryDialog
+  open={showImportBinary}
+  onImport={handleImportBinary}
+  onCancel={() => { showImportBinary = false; pendingBinaryPath = ''; }}
+/>
+
+{#if isDragging}
+  <div class="drop-overlay">
+    <div class="drop-card">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Box bottom -->
+        <rect x="8" y="28" width="32" height="12" rx="3"/>
+        <!-- Arrow downward into box -->
+        <line x1="24" y1="8" x2="24" y2="28"/>
+        <polyline points="16,20 24,28 32,20"/>
+      </svg>
+      <p>Drop to open</p>
+    </div>
+  </div>
+{/if}
+
 <div class="app-shell" onclick={() => { if (!loading && !saving) status = ''; }}>
   <!-- Toolbar: open + save icons -->
   <FileMenu onOpen={handleOpen} onSave={handleSave} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
@@ -276,7 +410,7 @@
     {#if status}
       <span>{status}</span>
     {:else if !currentFile}
-      <span class="hint">Open a HEX or S-record file to get started</span>
+      <span class="hint">Open a HEX, S-record or Binary file to get started</span>
     {/if}
   </footer>
 </div>
@@ -330,8 +464,47 @@
     opacity: 0.75;
   }
 
+  /* Drag-and-drop overlay */
+  .drop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 122, 204, 0.18);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .drop-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 36px 48px;
+    border: 2.5px dashed #007acc;
+    border-radius: 16px;
+    color: #007acc;
+    background: rgba(0, 122, 204, 0.08);
+  }
+
+  .drop-card svg {
+    width: 56px;
+    height: 56px;
+  }
+
+  .drop-card p {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #007acc;
+  }
+
   @media (prefers-color-scheme: light) {
     :global(body) { background: #fff; color: #1e1e1e; }
     .statusbar { background: #005f9e; }
+    .drop-card { border-color: #005f9e; color: #005f9e; background: rgba(0, 95, 158, 0.08); }
+    .drop-card p { color: #005f9e; }
   }
 </style>

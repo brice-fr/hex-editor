@@ -56,3 +56,14 @@ export async function detectFileFormat(path) {
 export async function saveFile(records, path, format) {
   return invoke('save_file', { records, path, format });
 }
+
+/**
+ * Flatten records into a raw binary blob and write to disk.
+ * @param {Array} records
+ * @param {string} path  Absolute destination path.
+ * @param {number} fillByte  0–255, used to fill gaps between records.
+ * @returns {Promise<number>}  Number of bytes written.
+ */
+export async function saveBinary(records, path, fillByte) {
+  return invoke('save_binary', { records, path, fillByte });
+}

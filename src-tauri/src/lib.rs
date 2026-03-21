@@ -17,6 +17,7 @@ pub fn run() {
             commands::parse_srec,
             commands::detect_file_format,
             commands::save_file,
+            commands::save_binary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -194,6 +194,41 @@ pub fn file_size(path: &str) -> Result<u64, String> {
     Ok(meta.len())
 }
 
+/// Flatten all data records into a contiguous binary blob, filling gaps with
+/// `fill_byte`, and write it to `path`. Returns the number of bytes written.
+pub fn write_binary(records: &[RecordData], path: &str, fill_byte: u8) -> Result<u64, String> {
+    let mut min_addr = u64::MAX;
+    let mut max_addr = 0u64;
+
+    for rec in records {
+        if !is_data_record(&rec.record_type) || rec.data.is_empty() {
+            continue;
+        }
+        let start = rec.address as u64;
+        let end   = start + rec.data.len() as u64;
+        if start < min_addr { min_addr = start; }
+        if end   > max_addr { max_addr = end;   }
+    }
+
+    if min_addr == u64::MAX {
+        return Err("No data records to export".into());
+    }
+
+    let size = (max_addr - min_addr) as usize;
+    let mut buf = vec![fill_byte; size];
+
+    for rec in records {
+        if !is_data_record(&rec.record_type) || rec.data.is_empty() {
+            continue;
+        }
+        let offset = (rec.address as u64 - min_addr) as usize;
+        buf[offset..offset + rec.data.len()].copy_from_slice(&rec.data);
+    }
+
+    write_file(path, &buf)?;
+    Ok(size as u64)
+}
+
 /// Detect the file format based on extension and/or magic bytes.
 /// Returns "ihex", "srec", "binary", or "unknown".
 pub fn detect_format(path: &str) -> String {

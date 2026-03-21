@@ -37,6 +37,13 @@ pub fn detect_file_format(path: String) -> String {
     file_operations::detect_format(&path)
 }
 
+/// Flatten records into a raw binary blob and write to disk.
+/// Returns the number of bytes written.
+#[tauri::command]
+pub fn save_binary(records: Vec<RecordData>, path: String, fill_byte: u8) -> Result<u64, String> {
+    file_operations::write_binary(&records, &path, fill_byte)
+}
+
 /// Serialise the current records to the requested format and write them to disk.
 ///
 /// `format` must be `"ihex"` or `"srec"` (case-insensitive).

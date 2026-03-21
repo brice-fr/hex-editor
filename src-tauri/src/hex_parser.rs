@@ -8,6 +8,7 @@ use ihex::Record;
 pub struct HexFile {
     pub records: Vec<HexRecord>,
     pub total_data_bytes: usize,
+    pub checksum_warnings: u32,
 }
 
 /// A single record extracted from an Intel HEX file.
@@ -27,9 +28,20 @@ pub fn parse(raw: &str) -> Result<HexFile, String> {
     let mut records: Vec<HexRecord> = Vec::new();
     let mut total_data_bytes: usize = 0;
     let mut extended_linear_addr: u32 = 0;
+    let mut checksum_warnings: u32 = 0;
 
     for result in reader {
-        let record = result.map_err(|e| format!("ihex parse error: {e}"))?;
+        let record = match result {
+            Ok(r) => r,
+            Err(e) => {
+                // Tolerate checksum errors — skip the bad record
+                if format!("{e}").to_lowercase().contains("checksum") {
+                    checksum_warnings += 1;
+                    continue;
+                }
+                return Err(format!("ihex parse error: {e}"));
+            }
+        };
 
         match &record {
             Record::ExtendedLinearAddress(upper) => {
@@ -82,5 +94,6 @@ pub fn parse(raw: &str) -> Result<HexFile, String> {
     Ok(HexFile {
         records,
         total_data_bytes,
+        checksum_warnings,
     })
 }

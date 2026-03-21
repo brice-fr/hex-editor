@@ -6,6 +6,7 @@
 pub struct SrecFile {
     pub records: Vec<SrecRecord>,
     pub total_data_bytes: usize,
+    pub checksum_warnings: u32,
 }
 
 /// A single S-record line.
@@ -23,6 +24,7 @@ pub struct SrecRecord {
 pub fn parse(raw: &str) -> Result<SrecFile, String> {
     let mut records: Vec<SrecRecord> = Vec::new();
     let mut total_data_bytes: usize = 0;
+    let mut checksum_warnings: u32 = 0;
 
     for (line_num, line) in raw.lines().enumerate() {
         let line = line.trim();
@@ -47,10 +49,8 @@ pub fn parse(raw: &str) -> Result<SrecFile, String> {
         let computed: u8 = data_bytes.iter().fold(0u8, |acc, &b| acc.wrapping_add(b));
         let expected = !computed;
         if expected != checksum_byte {
-            return Err(format!(
-                "line {}: checksum mismatch (got {checksum_byte:#04x}, expected {expected:#04x})",
-                line_num + 1
-            ));
+            checksum_warnings += 1;
+            continue;
         }
 
         // byte_count field is bytes[0]; remaining = address + data + checksum
@@ -109,6 +109,7 @@ pub fn parse(raw: &str) -> Result<SrecFile, String> {
     Ok(SrecFile {
         records,
         total_data_bytes,
+        checksum_warnings,
     })
 }
 
