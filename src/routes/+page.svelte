@@ -5,16 +5,24 @@
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
-  import { Menu, Submenu, MenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
+  import { PhysicalSize } from '@tauri-apps/api/dpi';
+  import { Menu, Submenu, MenuItem, CheckMenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
   import { open, save, message } from '@tauri-apps/plugin-dialog';
   import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile, saveBinary } from '$lib/api.js';
   import FileMenu from '$lib/components/FileMenu.svelte';
   import HexViewer from '$lib/components/HexViewer.svelte';
+  import SegmentList   from '$lib/components/SegmentList.svelte';
+  import DataInspector from '$lib/components/DataInspector.svelte';
   import SaveFormatDialog from '$lib/components/SaveFormatDialog.svelte';
   import GoToDialog  from '$lib/components/GoToDialog.svelte';
   import FindDialog  from '$lib/components/FindDialog.svelte';
   import AboutDialog from '$lib/components/AboutDialog.svelte';
   import ImportBinaryDialog from '$lib/components/ImportBinaryDialog.svelte';
+
+  // ── Persistent settings — read synchronously before first render ──────────
+  const LS = 'hex-editor.';
+  const lsGet = (key, fallback) => { const v = localStorage.getItem(LS + key); return v !== null ? v : fallback; };
+  const lsSet = (key, val)      => localStorage.setItem(LS + key, String(val));
 
   let records       = $state([]);
   let currentFile   = $state('');
@@ -33,7 +41,49 @@
   let gotoTarget       = $state(null);     // { addr, seq } — seq ensures reactivity on repeat
   let gotoSeq          = 0;
 
+  // ── Side-panel visibility — defaults to true on first launch ─────────────
+  let showSegmentList   = $state(lsGet('showSegmentList',   'true') === 'true');
+  let showDataInspector = $state(lsGet('showDataInspector', 'true') === 'true');
+
+  // Persist panel state immediately whenever it changes
+  $effect(() => { lsSet('showSegmentList',   showSegmentList); });
+  $effect(() => { lsSet('showDataInspector', showDataInspector); });
+
+  // References to native CheckMenuItems so we can sync their checked state
+  let segmentListMenuItem   = null;
+  let dataInspectorMenuItem = null;
+
+  // Keep native menu checkmarks in sync with state.
+  // NOTE: the value must be read into a local variable BEFORE the ?. call —
+  // optional chaining short-circuits argument evaluation when the object is
+  // null, so Svelte would never track the dependency otherwise.
+  $effect(() => { const v = showSegmentList;   segmentListMenuItem?.setChecked(v); });
+  $effect(() => { const v = showDataInspector; dataInspectorMenuItem?.setChecked(v); });
+
+  // ── Data Inspector address — follows scroll unless pinned by a byte click ─
+  let inspectorAddress = $state(0);
+  let inspectorPinned  = $state(false);
+
+  $effect(() => { if (!inspectorPinned) inspectorAddress = hexTopAddress; });
+
+  function handleByteClick(addr) {
+    inspectorAddress = addr;
+    inspectorPinned  = true;
+  }
+
   let unlistenDragDrop;
+  let resizeDebounce = null;
+
+  async function onWindowResize() {
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(async () => {
+      try {
+        const sz = await getCurrentWindow().outerSize();
+        lsSet('windowW', sz.width);
+        lsSet('windowH', sz.height);
+      } catch { /* ignore — window may be closing */ }
+    }, 400);
+  }
 
   // Address range of the loaded file (for GoToDialog validation)
   const addrRange = $derived((() => {
@@ -54,8 +104,10 @@
   }
 
   function handleFindNavigate(addr) {
-    gotoTarget = { addr, seq: ++gotoSeq };
-    status     = `Match at 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
+    gotoTarget       = { addr, seq: ++gotoSeq };
+    inspectorAddress = addr;
+    inspectorPinned  = true;
+    status           = `Match at 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
   }
 
   function handleGotoOpen() {
@@ -64,9 +116,16 @@
   }
 
   function handleGotoConfirm(addr) {
-    showGoto    = false;
-    gotoTarget  = { addr, seq: ++gotoSeq };
-    status      = `Navigated to 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
+    showGoto         = false;
+    gotoTarget       = { addr, seq: ++gotoSeq };
+    inspectorAddress = addr;
+    inspectorPinned  = true;
+    status           = `Navigated to 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
+  }
+
+  function handleSegmentJump(addr) {
+    gotoTarget = { addr, seq: ++gotoSeq };
+    status     = `Segment at 0x${addr.toString(16).toUpperCase().padStart(8, '0')}`;
   }
 
   // ── Shared open logic — called by both dialog and drag-drop ──────────────
@@ -97,7 +156,8 @@
         return;
       }
 
-      records       = parsed.records;
+      records          = parsed.records;
+      inspectorPinned  = false;
       currentFile   = path;
       currentFormat = format;
       const fileName = path.split('/').at(-1);
@@ -151,7 +211,8 @@
     status  = 'Loading…';
     try {
       const bytes = await openFile(path);
-      records       = [{ record_type: 'Data', address: baseAddr, data: bytes }];
+      records          = [{ record_type: 'Data', address: baseAddr, data: bytes }];
+      inspectorPinned  = false;
       currentFile   = path;
       currentFormat = 'binary';
       const fileName = path.split('/').at(-1);
@@ -225,6 +286,22 @@
     try {
       const isMac = /Mac/i.test(navigator.platform);
 
+      // ── View menu items — created here so we can call setChecked later ──
+      segmentListMenuItem = await CheckMenuItem.new({
+        id: 'view-segment-list',
+        text: 'Segment List',
+        checked: showSegmentList,
+        accelerator: 'CmdOrCtrl+Shift+L',
+        action: () => { showSegmentList = !showSegmentList; },
+      });
+      dataInspectorMenuItem = await CheckMenuItem.new({
+        id: 'view-data-inspector',
+        text: 'Data Inspector',
+        checked: showDataInspector,
+        accelerator: 'CmdOrCtrl+Shift+I',
+        action: () => { showDataInspector = !showDataInspector; },
+      });
+
       const aboutItem = await MenuItem.new({
         id: 'about',
         text: 'About Hex Editor',
@@ -233,66 +310,35 @@
 
       const menu = await Menu.new({
         items: [
-          // ① App menu — About lives here on macOS, in Help on other OSes
-          await Submenu.new({
-            text: 'Hex Editor',
-            items: [
-              ...(isMac ? [aboutItem, await PredefinedMenuItem.new({ item: 'Separator' })] : []),
-              await PredefinedMenuItem.new({ item: 'Services' }),
-              await PredefinedMenuItem.new({ item: 'Separator' }),
-              await PredefinedMenuItem.new({ item: 'Hide' }),
-              await PredefinedMenuItem.new({ item: 'HideOthers' }),
-              await PredefinedMenuItem.new({ item: 'ShowAll' }),
-              await PredefinedMenuItem.new({ item: 'Separator' }),
-              await PredefinedMenuItem.new({ item: 'Quit' }),
-            ],
-          }),
-          // ② File menu
+          // ① App menu — macOS only (Services / Hide / Quit)
+          ...(isMac ? [
+            await Submenu.new({
+              text: 'Hex Editor',
+              items: [
+                aboutItem,
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                await PredefinedMenuItem.new({ item: 'Services' }),
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                await PredefinedMenuItem.new({ item: 'Hide' }),
+                await PredefinedMenuItem.new({ item: 'HideOthers' }),
+                await PredefinedMenuItem.new({ item: 'ShowAll' }),
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                await PredefinedMenuItem.new({ item: 'Quit' }),
+              ],
+            }),
+          ] : []),
+          // ② File
           await Submenu.new({
             text: 'File',
             items: [
-              await MenuItem.new({
-                id: 'open',
-                text: 'Open…',
-                accelerator: 'CmdOrCtrl+O',
-                action: handleOpen,
-              }),
-              await MenuItem.new({
-                id: 'save-as',
-                text: 'Save as…',
-                accelerator: 'CmdOrCtrl+Shift+S',
-                action: handleSave,
-              }),
-              await MenuItem.new({
-                id: 'import-binary',
-                text: 'Import Binary…',
-                accelerator: 'CmdOrCtrl+B',
-                action: handleImportBinaryOpen,
-              }),
+              await MenuItem.new({ id: 'open', text: 'Open…', accelerator: 'CmdOrCtrl+O', action: handleOpen }),
+              await MenuItem.new({ id: 'save-as', text: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', action: handleSave }),
+              await MenuItem.new({ id: 'import-binary', text: 'Import Binary…', accelerator: 'CmdOrCtrl+B', action: handleImportBinaryOpen }),
               await PredefinedMenuItem.new({ item: 'Separator' }),
               await PredefinedMenuItem.new({ item: 'CloseWindow' }),
             ],
           }),
-          // ③ Search menu
-          await Submenu.new({
-            text: 'Search',
-            items: [
-              await MenuItem.new({
-                id: 'find',
-                text: 'Find…',
-                accelerator: 'CmdOrCtrl+F',
-                action: handleFindOpen,
-              }),
-              await PredefinedMenuItem.new({ item: 'Separator' }),
-              await MenuItem.new({
-                id: 'goto-address',
-                text: 'Go to Address…',
-                accelerator: 'CmdOrCtrl+G',
-                action: handleGotoOpen,
-              }),
-            ],
-          }),
-          // ④ Edit menu (copy / paste / select-all for the hex viewer)
+          // ③ Edit
           await Submenu.new({
             text: 'Edit',
             items: [
@@ -305,7 +351,26 @@
               await PredefinedMenuItem.new({ item: 'SelectAll' }),
             ],
           }),
-          // ⑤ Help menu — About lives here on Windows / Linux
+          // ④ Search
+          await Submenu.new({
+            text: 'Search',
+            items: [
+              await MenuItem.new({ id: 'find', text: 'Find…', accelerator: 'CmdOrCtrl+F', action: handleFindOpen }),
+              await PredefinedMenuItem.new({ item: 'Separator' }),
+              await MenuItem.new({ id: 'goto-address', text: 'Go to Address…', accelerator: 'CmdOrCtrl+G', action: handleGotoOpen }),
+            ],
+          }),
+          // ⑤ View — toggle side panels + native fullscreen
+          await Submenu.new({
+            text: 'View',
+            items: [
+              segmentListMenuItem,
+              dataInspectorMenuItem,
+              await PredefinedMenuItem.new({ item: 'Separator' }),
+              await PredefinedMenuItem.new({ item: 'Fullscreen' }),
+            ],
+          }),
+          // ⑥ Help — Windows / Linux only (About lives here)
           ...(!isMac ? [
             await Submenu.new({
               text: 'Help',
@@ -320,6 +385,18 @@
       // Non-fatal: native menu is best-effort
       console.warn('Could not build native menu:', err);
     }
+
+    // ── Window size — restore from previous session ───────────────────────────
+    try {
+      const savedW = parseInt(lsGet('windowW', '0'));
+      const savedH = parseInt(lsGet('windowH', '0'));
+      if (savedW > 100 && savedH > 100) {
+        await getCurrentWindow().setSize(new PhysicalSize(savedW, savedH));
+      }
+    } catch (e) {
+      console.warn('Could not restore window size:', e);
+    }
+    window.addEventListener('resize', onWindowResize);
 
     // ── Drag-and-drop support ──
     try {
@@ -343,6 +420,8 @@
 
   onDestroy(() => {
     if (unlistenDragDrop) unlistenDragDrop();
+    window.removeEventListener('resize', onWindowResize);
+    clearTimeout(resizeDebounce);
   });
 </script>
 
@@ -397,14 +476,41 @@
   <!-- Toolbar: open + save icons -->
   <FileMenu onOpen={handleOpen} onSave={handleSave} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
 
-  <main class="viewer-area">
-    <HexViewer
-      {records}
-      {gotoTarget}
-      onScrolled={() => { if (!loading && !saving) status = ''; }}
-      onTopAddress={(addr) => { hexTopAddress = addr; }}
-    />
-  </main>
+  <div class="content-area">
+    <main class="viewer-area">
+      <HexViewer
+        {records}
+        {gotoTarget}
+        onScrolled={() => { if (!loading && !saving) status = ''; }}
+        onTopAddress={(addr) => { hexTopAddress = addr; }}
+        onByteClick={handleByteClick}
+      />
+    </main>
+
+    {#if showSegmentList || showDataInspector}
+      <aside class="side-panel">
+        {#if showSegmentList}
+          <div class="side-section">
+            <SegmentList {records} topAddress={hexTopAddress} onJump={handleSegmentJump} onClose={() => (showSegmentList = false)} />
+          </div>
+        {/if}
+        {#if showSegmentList && showDataInspector}
+          <div class="side-divider"></div>
+        {/if}
+        {#if showDataInspector}
+          <div class="side-section">
+            <DataInspector
+              {records}
+              address={inspectorAddress}
+              pinned={inspectorPinned}
+              onUnpin={() => (inspectorPinned = false)}
+              onClose={() => (showDataInspector = false)}
+            />
+          </div>
+        {/if}
+      </aside>
+    {/if}
+  </div>
 
   <footer class="statusbar">
     {#if status}
@@ -438,9 +544,49 @@
     height: 100vh;
   }
 
+  /* ── Content area: hex viewer + optional side panel ── */
+  .content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 0;
+  }
+
   .viewer-area {
     flex: 1;
     overflow: hidden;
+    min-width: 0;
+  }
+
+  /* ── Side panel ── */
+  .side-panel {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #3c3c3c;
+    overflow: hidden;
+    background: #1e1e1e;
+  }
+
+  .side-section {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-divider {
+    height: 1px;
+    flex-shrink: 0;
+    background: #3c3c3c;
+  }
+
+  @media (prefers-color-scheme: light) {
+    .side-panel   { background: #fff; border-left-color: #d0d0d0; }
+    .side-divider { background: #d0d0d0; }
   }
 
   .statusbar {

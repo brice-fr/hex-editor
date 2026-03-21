@@ -224,7 +224,7 @@
          onpointermove={onHeaderPointerMove}
          onpointerup={onHeaderPointerUp}>
       <span class="panel-title">Find</span>
-      <button class="close-btn" onclick={onClose} aria-label="Close find panel">
+      <button class="close-btn" onpointerdown={(e) => e.stopPropagation()} onclick={onClose} aria-label="Close find panel">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
              stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">
           <line x1="18" y1="6" x2="6" y2="18"/>

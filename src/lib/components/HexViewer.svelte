@@ -3,7 +3,7 @@
 
 <script>
   /** @type {{ record_type: string; address: number; data: number[] }[]} */
-  let { records = [], bytesPerRow = 16, onScrolled = () => {}, onTopAddress = (_addr) => {}, gotoTarget = null } = $props();
+  let { records = [], bytesPerRow = 16, onScrolled = () => {}, onTopAddress = (_addr) => {}, onByteClick = (_addr) => {}, gotoTarget = null } = $props();
 
   const ROW_HEIGHT = 20;
   const OVERSCAN   = 8;
@@ -213,7 +213,8 @@
                     {#if byte === null}
                       <span class="hb ec-{i % 2} blank">__</span>
                     {:else}
-                      <span class="hb ec-{i % 2}">{hex8(byte)}</span>
+                      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                      <span class="hb ec-{i % 2} clickable" onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}>{hex8(byte)}</span>
                     {/if}
                   {/each}
                   {#each { length: pad } as _, i}
@@ -225,11 +226,12 @@
 
                 <span class="v-sep"></span>
                 <span class="col-ascii-area">
-                  {#each row.bytes as byte}
+                  {#each row.bytes as byte, i}
                     {#if byte === null}
                       <span class="ac blank">·</span>
                     {:else}
-                      <span class="ac" class:np={!isPrint(byte)}>{toAscii(byte)}</span>
+                      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                      <span class="ac clickable" class:np={!isPrint(byte)} onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}>{toAscii(byte)}</span>
                     {/if}
                   {/each}
                 </span>
@@ -357,6 +359,21 @@
 
   .hb.pad {
     color: transparent;
+  }
+
+  .hb.clickable,
+  .ac.clickable {
+    cursor: pointer;
+  }
+
+  .hb.clickable:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-radius: 2px;
+  }
+
+  .ac.clickable:hover {
+    background: rgba(255, 255, 255, 0.10);
+    border-radius: 2px;
   }
 
   /* Mid-row gap between byte 7 and byte 8 */
