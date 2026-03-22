@@ -23,6 +23,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(StartupFile(Mutex::new(startup_path)))
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
