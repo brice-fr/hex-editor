@@ -117,7 +117,7 @@
             {#each [...grouped] as [group, groupEntries]}
               <div class="group-header">{group}</div>
               {#each groupEntries as entry}
-                {@const isDisabled = isMac && !entry.can_deassociate && !pending[entry.ext]}
+                {@const isDisabled = isMac && !entry.can_deassociate && pending[entry.ext]}
                 <label class="entry-row" class:disabled={isDisabled}>
                   <input
                     type="checkbox"
