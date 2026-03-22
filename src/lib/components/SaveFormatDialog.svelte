@@ -203,8 +203,8 @@
   }
 
   .card {
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--c-raised);
+    border: 1px solid var(--c-border2);
     border-radius: 10px;
     padding: 24px 28px 20px;
     width: 320px;
@@ -217,13 +217,13 @@
   .title {
     font-size: 15px;
     font-weight: 600;
-    color: #e8e8e8;
+    color: var(--c-text);
     margin: 0;
   }
 
   .subtitle {
     font-size: 12px;
-    color: #888;
+    color: var(--c-muted);
     margin: 0 0 14px;
   }
 
@@ -239,8 +239,8 @@
     align-items: center;
     gap: 14px;
     padding: 12px 14px;
-    background: #383838;
-    border: 1px solid #4a4a4a;
+    background: var(--c-hover);
+    border: 1px solid var(--c-border2);
     border-radius: 7px;
     cursor: pointer;
     color: inherit;
@@ -249,8 +249,8 @@
   }
 
   .fmt-btn:hover {
-    background: #0e639c;
-    border-color: #1177bb;
+    background: var(--c-accent-b);
+    border-color: var(--c-accent-h);
   }
 
   .fmt-btn:active {
@@ -259,7 +259,7 @@
 
   .fmt-icon {
     flex-shrink: 0;
-    color: #9cdcfe;
+    color: var(--c-accent-t);
     display: flex;
   }
 
@@ -281,12 +281,12 @@
   .fmt-name {
     font-size: 13px;
     font-weight: 500;
-    color: #e0e0e0;
+    color: var(--c-text);
   }
 
   .fmt-ext {
     font-size: 11px;
-    color: #888;
+    color: var(--c-muted);
     font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
   }
 
@@ -298,7 +298,7 @@
   /* Binary sub-panel */
   .field-label {
     font-size: 11px;
-    color: #888;
+    color: var(--c-muted);
     letter-spacing: 0.02em;
     margin-top: 8px;
   }
@@ -314,10 +314,10 @@
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 14px;
     padding: 7px 10px;
-    background: #1e1e1e;
-    border: 1px solid #555;
+    background: var(--c-bg);
+    border: 1px solid var(--c-dim);
     border-radius: 5px;
-    color: #9cdcfe;
+    color: var(--c-accent-t);
     outline: none;
     width: 60px;
     letter-spacing: 0.05em;
@@ -325,19 +325,19 @@
     transition: border-color 0.15s;
   }
 
-  .fill-input:focus { border-color: #007acc; }
-  .fill-input.invalid { border-color: #f44747; }
+  .fill-input:focus { border-color: var(--c-accent); }
+  .fill-input.invalid { border-color: var(--c-err); }
 
   .fill-decimal {
     font-size: 11px;
-    color: #888;
+    color: var(--c-muted);
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', monospace;
     white-space: nowrap;
   }
 
   .error-msg {
     font-size: 11px;
-    color: #f44747;
+    color: var(--c-err);
     min-height: 14px;
   }
 
@@ -359,39 +359,25 @@
 
   .btn-cancel, .btn-back {
     background: transparent;
-    border: 1px solid #555;
-    color: #aaa;
+    border: 1px solid var(--c-dim);
+    color: var(--c-muted);
   }
 
   .btn-cancel:hover, .btn-back:hover {
-    background: #3a3a3a;
-    color: #e0e0e0;
+    background: var(--c-hover);
+    color: var(--c-text);
   }
 
   .btn-ok {
-    background: #0e639c;
+    background: var(--c-accent-b);
     border: 1px solid transparent;
     color: #fff;
   }
 
-  .btn-ok:hover:not(:disabled) { background: #1177bb; }
+  .btn-ok:hover:not(:disabled) { background: var(--c-accent-h); }
 
   .btn-ok:disabled {
     opacity: 0.45;
     cursor: not-allowed;
-  }
-
-  @media (prefers-color-scheme: light) {
-    .card          { background: #f8f8f8; border-color: #ddd; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .title         { color: #1e1e1e; }
-    .fmt-btn       { background: #fff; border-color: #ddd; }
-    .fmt-btn:hover { background: #0e639c; border-color: #0e639c; }
-    .fmt-name      { color: #1e1e1e; }
-    .fmt-ext       { color: #888; }
-    .btn-cancel    { border-color: #ccc; color: #555; }
-    .btn-cancel:hover { background: #eee; color: #1e1e1e; }
-    .fill-input    { background: #fff; border-color: #ccc; color: #0070c1; }
-    .btn-back      { border-color: #ccc; color: #555; }
-    .btn-back:hover { background: #eee; color: #1e1e1e; }
   }
 </style>

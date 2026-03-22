@@ -58,3 +58,15 @@ pub fn save_file(records: Vec<RecordData>, path: String, format: String) -> Resu
     };
     file_operations::write_file(&path, content.as_bytes())
 }
+
+#[tauri::command]
+pub async fn get_file_associations() -> Result<Vec<crate::file_assoc::AssocEntry>, String> {
+    Ok(crate::file_assoc::get_associations())
+}
+
+#[tauri::command]
+pub async fn apply_file_associations(
+    changes: Vec<(String, bool)>,
+) -> Result<(), String> {
+    crate::file_assoc::apply_associations(&changes)
+}

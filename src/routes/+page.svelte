@@ -18,6 +18,8 @@
   import FindDialog  from '$lib/components/FindDialog.svelte';
   import AboutDialog from '$lib/components/AboutDialog.svelte';
   import ImportBinaryDialog from '$lib/components/ImportBinaryDialog.svelte';
+  import PreferencesDialog from '$lib/components/PreferencesDialog.svelte';
+  import FileAssocDialog from '$lib/components/FileAssocDialog.svelte';
 
   // ── Persistent settings — read synchronously before first render ──────────
   const LS = 'hex-editor.';
@@ -40,6 +42,21 @@
   let hexTopAddress    = $state(0);        // tracks topmost visible address in HexViewer
   let gotoTarget       = $state(null);     // { addr, seq } — seq ensures reactivity on repeat
   let gotoSeq          = 0;
+
+  // ── Display preferences ────────────────────────────────────────────────────
+  let fontSize        = $state(parseInt(lsGet('fontSize',    '13')));
+  let bytesPerRow     = $state(parseInt(lsGet('bytesPerRow', '16')));
+  let theme           = $state(lsGet('theme', 'system'));
+  let showPreferences = $state(false);
+  let showFileAssoc = $state(false);
+
+  $effect(() => { lsSet('fontSize',    fontSize); });
+  $effect(() => { lsSet('bytesPerRow', bytesPerRow); });
+  $effect(() => { lsSet('theme',       theme); });
+
+  $effect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'system' ? '' : theme);
+  });
 
   // ── Side-panel visibility — defaults to true on first launch ─────────────
   let showSegmentList   = $state(lsGet('showSegmentList',   'true') === 'true');
@@ -308,6 +325,19 @@
         action: () => (showAbout = true),
       });
 
+      const preferencesItem = await MenuItem.new({
+        id: 'preferences',
+        text: 'Preferences…',
+        accelerator: 'CmdOrCtrl+,',
+        action: () => { showPreferences = true; },
+      });
+
+      const fileAssocItem = await MenuItem.new({
+        id: 'file-associations',
+        text: 'File Associations…',
+        action: () => { showFileAssoc = true; },
+      });
+
       const menu = await Menu.new({
         items: [
           // ① App menu — macOS only (Services / Hide / Quit)
@@ -315,6 +345,7 @@
             await Submenu.new({
               text: 'Hex Editor',
               items: [
+                preferencesItem,
                 aboutItem,
                 await PredefinedMenuItem.new({ item: 'Separator' }),
                 await PredefinedMenuItem.new({ item: 'Services' }),
@@ -368,6 +399,15 @@
               dataInspectorMenuItem,
               await PredefinedMenuItem.new({ item: 'Separator' }),
               await PredefinedMenuItem.new({ item: 'Fullscreen' }),
+              ...(!isMac ? [
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                preferencesItem,
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                fileAssocItem,
+              ] : [
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                fileAssocItem,
+              ]),
             ],
           }),
           // ⑥ Help — Windows / Linux only (About lives here)
@@ -456,6 +496,19 @@
   onCancel={() => { showImportBinary = false; pendingBinaryPath = ''; }}
 />
 
+<PreferencesDialog
+  open={showPreferences}
+  {fontSize}
+  {bytesPerRow}
+  {theme}
+  onFontSize={(n) => { fontSize = n; }}
+  onBytesPerRow={(n) => { bytesPerRow = n; }}
+  onTheme={(t) => { theme = t; }}
+  onClose={() => { showPreferences = false; }}
+/>
+
+<FileAssocDialog open={showFileAssoc} onClose={() => { showFileAssoc = false; }} />
+
 {#if isDragging}
   <div class="drop-overlay">
     <div class="drop-card">
@@ -480,6 +533,8 @@
     <main class="viewer-area">
       <HexViewer
         {records}
+        {bytesPerRow}
+        {fontSize}
         {gotoTarget}
         onScrolled={() => { if (!loading && !saving) status = ''; }}
         onTopAddress={(addr) => { hexTopAddress = addr; }}
@@ -522,6 +577,92 @@
 </div>
 
 <style>
+  :global(:root) {
+    --c-bg:        #1e1e1e;
+    --c-surface:   #252526;
+    --c-raised:    #2d2d2d;
+    --c-hover:     #3c3c3c;
+    --c-border:    #3a3a3a;
+    --c-border2:   #454545;
+    --c-text:      #e0e0e0;
+    --c-text2:     #ccc;
+    --c-muted:     #888;
+    --c-dim:       #555;
+    --c-accent:    #007acc;
+    --c-accent-t:  #9cdcfe;
+    --c-accent-b:  #0e639c;
+    --c-accent-h:  #1177bb;
+    --c-accent-bg: rgba(0,122,204,0.15);
+    --c-err:       #f47171;
+    --c-err-bg:    rgba(244,71,71,0.15);
+    --c-gap-bg:    #1a1a1a;
+    --c-gap-text:  #555;
+    --c-addr:      #569cd6;
+    --c-null:      #3a3a3a;
+    --c-null-text: #3a3a3a;
+    --c-ec0:       transparent;
+    --c-ec1:       rgba(255,255,255,0.03);
+    --c-header-bg: #1e1e1e;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :global(:root:not([data-theme="dark"])) {
+      --c-bg:        #ffffff;
+      --c-surface:   #f8f8f8;
+      --c-raised:    #f0f0f0;
+      --c-hover:     #e8e8e8;
+      --c-border:    #e0e0e0;
+      --c-border2:   #d4d4d4;
+      --c-text:      #1e1e1e;
+      --c-text2:     #444;
+      --c-muted:     #666;
+      --c-dim:       #999;
+      --c-accent:    #0070c1;
+      --c-accent-t:  #0070c1;
+      --c-accent-b:  #0e639c;
+      --c-accent-h:  #0080d4;
+      --c-accent-bg: rgba(0,112,193,0.10);
+      --c-err:       #d32f2f;
+      --c-err-bg:    rgba(211,47,47,0.10);
+      --c-gap-bg:    #f0f0f0;
+      --c-gap-text:  #aaa;
+      --c-addr:      #0451a5;
+      --c-null:      #e8e8e8;
+      --c-null-text: #e8e8e8;
+      --c-ec0:       transparent;
+      --c-ec1:       rgba(0,0,0,0.03);
+      --c-header-bg: #f3f3f3;
+    }
+  }
+
+  :global(:root[data-theme="light"]) {
+    --c-bg:        #ffffff;
+    --c-surface:   #f8f8f8;
+    --c-raised:    #f0f0f0;
+    --c-hover:     #e8e8e8;
+    --c-border:    #e0e0e0;
+    --c-border2:   #d4d4d4;
+    --c-text:      #1e1e1e;
+    --c-text2:     #444;
+    --c-muted:     #666;
+    --c-dim:       #999;
+    --c-accent:    #0070c1;
+    --c-accent-t:  #0070c1;
+    --c-accent-b:  #0e639c;
+    --c-accent-h:  #0080d4;
+    --c-accent-bg: rgba(0,112,193,0.10);
+    --c-err:       #d32f2f;
+    --c-err-bg:    rgba(211,47,47,0.10);
+    --c-gap-bg:    #f0f0f0;
+    --c-gap-text:  #aaa;
+    --c-addr:      #0451a5;
+    --c-null:      #e8e8e8;
+    --c-null-text: #e8e8e8;
+    --c-ec0:       transparent;
+    --c-ec1:       rgba(0,0,0,0.03);
+    --c-header-bg: #f3f3f3;
+  }
+
   :global(*, *::before, *::after) {
     box-sizing: border-box;
     margin: 0;
@@ -529,8 +670,8 @@
   }
 
   :global(body) {
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--c-bg);
+    color: var(--c-text);
     overflow: hidden;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
                  'Helvetica Neue', Arial, sans-serif;
@@ -565,9 +706,9 @@
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid #3c3c3c;
+    border-left: 1px solid var(--c-hover);
     overflow: hidden;
-    background: #1e1e1e;
+    background: var(--c-bg);
   }
 
   .side-section {
@@ -581,12 +722,7 @@
   .side-divider {
     height: 1px;
     flex-shrink: 0;
-    background: #3c3c3c;
-  }
-
-  @media (prefers-color-scheme: light) {
-    .side-panel   { background: #fff; border-left-color: #d0d0d0; }
-    .side-divider { background: #d0d0d0; }
+    background: var(--c-hover);
   }
 
   .statusbar {
@@ -594,7 +730,7 @@
     align-items: center;
     height: 22px;
     padding: 0 10px;
-    background: #007acc;
+    background: var(--c-accent);
     color: #fff;
     font-size: 11.5px;
     font-weight: 400;
@@ -615,7 +751,7 @@
     position: fixed;
     inset: 0;
     z-index: 200;
-    background: rgba(0, 122, 204, 0.18);
+    background: var(--c-accent-bg);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -629,10 +765,10 @@
     align-items: center;
     gap: 14px;
     padding: 36px 48px;
-    border: 2.5px dashed #007acc;
+    border: 2.5px dashed var(--c-accent);
     border-radius: 16px;
-    color: #007acc;
-    background: rgba(0, 122, 204, 0.08);
+    color: var(--c-accent);
+    background: var(--c-accent-bg);
   }
 
   .drop-card svg {
@@ -644,13 +780,6 @@
     font-size: 18px;
     font-weight: 600;
     letter-spacing: 0.01em;
-    color: #007acc;
-  }
-
-  @media (prefers-color-scheme: light) {
-    :global(body) { background: #fff; color: #1e1e1e; }
-    .statusbar { background: #005f9e; }
-    .drop-card { border-color: #005f9e; color: #005f9e; background: rgba(0, 95, 158, 0.08); }
-    .drop-card p { color: #005f9e; }
+    color: var(--c-accent);
   }
 </style>

@@ -117,8 +117,8 @@
   }
 
   .card {
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--c-raised);
+    border: 1px solid var(--c-border2);
     border-radius: 10px;
     padding: 22px 24px 18px;
     width: 300px;
@@ -131,13 +131,13 @@
   .title {
     font-size: 14px;
     font-weight: 600;
-    color: #e8e8e8;
+    color: var(--c-text);
     margin-bottom: 4px;
   }
 
   .field-label {
     font-size: 11px;
-    color: #888;
+    color: var(--c-muted);
     letter-spacing: 0.02em;
   }
 
@@ -145,10 +145,10 @@
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 14px;
     padding: 7px 10px;
-    background: #1e1e1e;
-    border: 1px solid #555;
+    background: var(--c-bg);
+    border: 1px solid var(--c-dim);
     border-radius: 5px;
-    color: #9cdcfe;
+    color: var(--c-accent-t);
     outline: none;
     width: 100%;
     letter-spacing: 0.05em;
@@ -156,16 +156,16 @@
   }
 
   .addr-input:focus {
-    border-color: #007acc;
+    border-color: var(--c-accent);
   }
 
   .addr-input.invalid {
-    border-color: #f44747;
+    border-color: var(--c-err);
   }
 
   .error-msg {
     font-size: 11px;
-    color: #f44747;
+    color: var(--c-err);
     min-height: 14px;
   }
 
@@ -187,25 +187,17 @@
 
   .btn-cancel {
     background: transparent;
-    border: 1px solid #555;
-    color: #aaa;
+    border: 1px solid var(--c-dim);
+    color: var(--c-muted);
   }
 
-  .btn-cancel:hover { background: #3a3a3a; color: #e0e0e0; }
+  .btn-cancel:hover { background: var(--c-hover); color: var(--c-text); }
 
   .btn-ok {
-    background: #0e639c;
+    background: var(--c-accent-b);
     border: 1px solid transparent;
     color: #fff;
   }
 
-  .btn-ok:hover { background: #1177bb; }
-
-  @media (prefers-color-scheme: light) {
-    .card        { background: #f8f8f8; border-color: #ddd; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-    .title       { color: #1e1e1e; }
-    .addr-input  { background: #fff; border-color: #ccc; color: #0070c1; }
-    .btn-cancel  { border-color: #ccc; color: #555; }
-    .btn-cancel:hover { background: #eee; color: #1e1e1e; }
-  }
+  .btn-ok:hover { background: var(--c-accent-h); }
 </style>

@@ -67,3 +67,11 @@ export async function saveFile(records, path, format) {
 export async function saveBinary(records, path, fillByte) {
   return invoke('save_binary', { records, path, fillByte });
 }
+
+export async function getFileAssociations() {
+  return await invoke('get_file_associations');
+}
+
+export async function applyFileAssociations(changes) {
+  return await invoke('apply_file_associations', { changes });
+}

@@ -3,9 +3,9 @@
 
 <script>
   /** @type {{ record_type: string; address: number; data: number[] }[]} */
-  let { records = [], bytesPerRow = 16, onScrolled = () => {}, onTopAddress = (_addr) => {}, onByteClick = (_addr) => {}, gotoTarget = null } = $props();
+  let { records = [], bytesPerRow = 16, fontSize = 13, onScrolled = () => {}, onTopAddress = (_addr) => {}, onByteClick = (_addr) => {}, gotoTarget = null } = $props();
 
-  const ROW_HEIGHT = 20;
+  const ROW_HEIGHT = $derived(fontSize + 7);
   const OVERSCAN   = 8;
 
   function buildRows(records, bytesPerRow) {
@@ -155,10 +155,10 @@
   function toAscii(b) { return b !== null && b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : '.'; }
   function isPrint(b) { return b !== null && b >= 0x20 && b < 0x7f; }
 
-  const COLS = Array.from({ length: 16 }, (_, i) => i);
+  const COLS = $derived(Array.from({ length: bytesPerRow }, (_, i) => i));
 </script>
 
-<div class="hex-viewer">
+<div class="hex-viewer" style="font-size:{fontSize}px">
   {#if rows.length === 0}
     <p class="empty-state">No data to display. Open an Intel HEX or S-record file.</p>
   {:else}
@@ -195,14 +195,14 @@
         <div class="visible-rows" style="top:{offsetTop}px;">
           {#each visibleRows as row (row.id)}
             {#if row.type === 'gap'}
-              <div class="gap-row">
+              <div class="gap-row" style="height:{ROW_HEIGHT}px;">
                 <div class="gap-line"></div>
                 <span class="gap-label">gap: 0x{row.gapBytes.toString(16).toUpperCase()} bytes ({row.gapBytes}) · {hex32(row.fromAddr)} – {hex32(row.toAddr - 1)}</span>
                 <div class="gap-line"></div>
               </div>
             {:else}
               {@const pad = bytesPerRow - row.bytes.length}
-              <div class="hex-row" role="row">
+              <div class="hex-row" role="row" style="height:{ROW_HEIGHT}px;">
 
                 <span class="col-addr">{hex32(row.address)}</span>
                 <span class="v-sep"></span>
@@ -254,12 +254,11 @@
 <style>
   .hex-viewer {
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', Courier, monospace;
-    font-size: 13px;
     height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: #1e1e1e;
+    background: var(--c-bg);
   }
 
   /* ── Header ── */
@@ -267,14 +266,12 @@
     display: flex;
     align-items: stretch;
     height: 22px;
-    background: #252526;
-    border-bottom: 2px solid #3c3c3c;
+    background: var(--c-surface);
+    border-bottom: 2px solid var(--c-hover);
     flex-shrink: 0;
-    user-select: none;
-    font-size: 13px;
     font-weight: 400;
     letter-spacing: 0;
-    color: #666;
+    color: var(--c-dim);
   }
 
   /* ── Scroll container ── */
@@ -300,16 +297,15 @@
   .hex-row {
     display: flex;
     align-items: stretch;
-    height: 20px;         /* must match ROW_HEIGHT */
   }
 
   .hex-row:nth-child(odd) {
-    background: rgba(255, 255, 255, 0.015);
+    background: var(--c-ec1);
   }
 
   /* On hover: flatten per-cell backgrounds, apply uniform highlight */
   .hex-row:hover {
-    background: rgba(255, 255, 255, 0.055);
+    background: var(--c-hover);
   }
 
   .hex-row:hover .hb.ec-0,
@@ -324,13 +320,13 @@
     flex-shrink: 0;
     width: calc(8ch + 22px);
     padding: 0 10px 0 12px;
-    color: #569cd6;
+    color: var(--c-addr);
   }
 
   .v-sep {
     width: 2px;
     flex-shrink: 0;
-    background: #3c3c3c;
+    background: var(--c-hover);
     align-self: stretch;
   }
 
@@ -349,12 +345,12 @@
     justify-content: center;
     width: 3ch;
     flex-shrink: 0;
-    color: #d4d4d4;
+    color: var(--c-text);
   }
 
   /* Alternating column shading */
   .hb.ec-0 {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--c-ec1);
   }
 
   .hb.pad {
@@ -367,12 +363,12 @@
   }
 
   .hb.clickable:hover {
-    background: rgba(255, 255, 255, 0.12) !important;
+    background: var(--c-hover) !important;
     border-radius: 2px;
   }
 
   .ac.clickable:hover {
-    background: rgba(255, 255, 255, 0.10);
+    background: var(--c-hover);
     border-radius: 2px;
   }
 
@@ -397,29 +393,29 @@
     width: 1ch;
     padding: 0 2px;
     flex-shrink: 0;
-    color: #9cdcfe;
+    color: var(--c-accent-t);
   }
 
   /* Non-printable dot */
   .ac.np {
-    color: #444;
+    color: var(--c-border2);
   }
 
   /* Gap separator row */
   .gap-row {
     display: flex;
     align-items: center;
-    height: 20px;
     padding: 0 12px;
     gap: 8px;
     flex-shrink: 0;
+    background: var(--c-gap-bg);
   }
   .gap-line {
     flex: 1;
-    border-top: 1px dashed #383838;
+    border-top: 1px dashed var(--c-border);
   }
   .gap-label {
-    color: #5a5a5a;
+    color: var(--c-gap-text);
     font-size: 11px;
     white-space: nowrap;
     flex-shrink: 0;
@@ -427,45 +423,26 @@
   }
   /* Blank/gap byte cells (leading nulls at segment start) */
   .hb.blank {
-    color: #3a3a3a;
+    color: var(--c-null-text);
   }
   .ac.blank {
-    color: #3a3a3a;
+    color: var(--c-null-text);
   }
 
   /* ── Row-count footer ── */
   .row-count {
     padding: 3px 12px;
     font-size: 11px;
-    color: #555;
-    border-top: 1px solid #2a2a2a;
+    color: var(--c-dim);
+    border-top: 1px solid var(--c-border);
     flex-shrink: 0;
     user-select: none;
   }
 
   /* ── Empty state ── */
   .empty-state {
-    color: #555;
+    color: var(--c-dim);
     text-align: center;
     margin-top: 4rem;
-  }
-
-  /* ── Light mode ── */
-  @media (prefers-color-scheme: light) {
-    .hex-viewer             { background: #fff; }
-    .hex-header             { background: #f5f5f5; border-bottom-color: #d0d0d0; }
-    .hex-row:nth-child(odd) { background: rgba(0, 0, 0, 0.01); }
-    .hex-row:hover          { background: rgba(0, 120, 212, 0.07); }
-    .col-addr               { color: #0070c1; }
-    .v-sep                  { background: #d0d0d0; }
-    .hb                     { color: #1e1e1e; }
-    .hb.ec-0                { background: rgba(0, 0, 0, 0.04); }
-    .ac                     { color: #267f99; }
-    .ac.np                  { color: #c8c8c8; }
-    .row-count              { color: #aaa; border-top-color: #eee; }
-    .gap-line               { border-top-color: #d8d8d8; }
-    .gap-label              { color: #aaa; }
-    .hb.blank               { color: #ccc; }
-    .ac.blank               { color: #ccc; }
   }
 </style>

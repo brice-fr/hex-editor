@@ -104,8 +104,8 @@
     flex-direction: column;
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 12px;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--c-bg);
+    color: var(--c-text);
     overflow: hidden;
   }
 
@@ -119,9 +119,9 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #888;
-    background: #252526;
-    border-bottom: 1px solid #3c3c3c;
+    color: var(--c-muted);
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-hover);
     flex-shrink: 0;
     user-select: none;
   }
@@ -134,8 +134,8 @@
   }
 
   .badge {
-    background: #3c3c3c;
-    color: #aaa;
+    background: var(--c-hover);
+    color: var(--c-text2);
     border-radius: 10px;
     padding: 0 6px;
     font-size: 10px;
@@ -145,7 +145,7 @@
   .close-btn {
     background: none;
     border: none;
-    color: #555;
+    color: var(--c-dim);
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
@@ -157,12 +157,12 @@
   }
 
   .close-btn:hover {
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--c-text2);
+    background: var(--c-hover);
   }
 
   .empty {
-    color: #555;
+    color: var(--c-dim);
     text-align: center;
     margin-top: 2rem;
     font-family: 'Inter', sans-serif;
@@ -183,12 +183,12 @@
   thead th {
     position: sticky;
     top: 0;
-    background: #252526;
-    color: #666;
+    background: var(--c-surface);
+    color: var(--c-dim);
     font-weight: 400;
     padding: 3px 8px;
     text-align: left;
-    border-bottom: 1px solid #3c3c3c;
+    border-bottom: 1px solid var(--c-hover);
     font-size: 11px;
     user-select: none;
   }
@@ -201,41 +201,23 @@
   }
 
   tbody tr:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--c-ec1);
   }
 
   tbody tr.active {
-    background: rgba(0, 122, 204, 0.16);
+    background: var(--c-accent-bg);
   }
 
-  tbody tr.active td { color: #4fc3f7; }
-  tbody tr.active .td-addr { color: #4fc3f7; }
+  tbody tr.active td { color: var(--c-accent-t); }
+  tbody tr.active .td-addr { color: var(--c-accent-t); }
 
   td {
     padding: 3px 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--c-ec1);
     white-space: nowrap;
   }
 
-  .td-num  { color: #555; text-align: center; width: 24px; }
-  .td-addr { color: #569cd6; font-size: 11.5px; }
-  .td-size { color: #9cdcfe; text-align: right; padding-right: 10px; }
-
-  /* Light mode */
-  @media (prefers-color-scheme: light) {
-    .segment-panel            { background: #fff; color: #1e1e1e; }
-    .panel-header             { background: #f5f5f5; border-bottom-color: #d0d0d0; color: #888; }
-    .close-btn                { color: #bbb; }
-    .close-btn:hover          { color: #666; background: rgba(0,0,0,0.06); }
-    .badge                    { background: #e0e0e0; color: #888; }
-    thead th                  { background: #f5f5f5; border-bottom-color: #d0d0d0; }
-    tbody tr:hover            { background: rgba(0, 0, 0, 0.03); }
-    tbody tr.active           { background: rgba(0, 122, 204, 0.08); }
-    tbody tr.active td        { color: #0070c1; }
-    tbody tr.active .td-addr  { color: #0070c1; }
-    td                        { border-bottom-color: rgba(0, 0, 0, 0.05); }
-    .td-num                   { color: #bbb; }
-    .td-addr                  { color: #0070c1; }
-    .td-size                  { color: #267f99; }
-  }
+  .td-num  { color: var(--c-dim); text-align: center; width: 24px; }
+  .td-addr { color: var(--c-addr); font-size: 11.5px; }
+  .td-size { color: var(--c-accent-t); text-align: right; padding-right: 10px; }
 </style>

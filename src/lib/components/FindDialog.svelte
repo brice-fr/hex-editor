@@ -328,8 +328,8 @@
     top: 56px;       /* below the 36px toolbar + some gap */
     right: 16px;
     width: 340px;
-    background: #252526;
-    border: 1px solid #454545;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border2);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
     z-index: 60;
@@ -346,7 +346,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 12px 8px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--c-border);
     cursor: move;
     user-select: none;
   }
@@ -354,7 +354,7 @@
   .panel-title {
     font-size: 13px;
     font-weight: 600;
-    color: #e0e0e0;
+    color: var(--c-text);
     letter-spacing: 0.01em;
   }
 
@@ -368,18 +368,18 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    color: #888;
+    color: var(--c-muted);
     padding: 0;
     transition: background 0.1s, color 0.1s;
   }
 
-  .close-btn:hover { background: #3c3c3c; color: #e0e0e0; }
+  .close-btn:hover { background: var(--c-hover); color: var(--c-text); }
   .close-btn svg   { width: 14px; height: 14px; }
 
   /* ── Tabs ── */
   .tab-bar {
     display: flex;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--c-border);
   }
 
   .tab {
@@ -391,13 +391,13 @@
     cursor: pointer;
     font-size: 12px;
     font-weight: 500;
-    color: #888;
+    color: var(--c-muted);
     transition: color 0.1s, border-color 0.1s;
     font-family: inherit;
   }
 
-  .tab:hover  { color: #ccc; }
-  .tab.active { color: #9cdcfe; border-bottom-color: #9cdcfe; }
+  .tab:hover  { color: var(--c-text2); }
+  .tab.active { color: var(--c-accent-t); border-bottom-color: var(--c-accent-t); }
 
   /* ── Input ── */
   .input-row {
@@ -409,17 +409,17 @@
 
   .input-label {
     font-size: 11px;
-    color: #888;
+    color: var(--c-muted);
     user-select: none;
   }
 
   .find-input {
     width: 100%;
     padding: 5px 8px;
-    background: #1e1e1e;
-    border: 1px solid #3c3c3c;
+    background: var(--c-bg);
+    border: 1px solid var(--c-hover);
     border-radius: 4px;
-    color: #d4d4d4;
+    color: var(--c-text);
     font-size: 12.5px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     outline: none;
@@ -431,7 +431,7 @@
     letter-spacing: 0.05em;
   }
 
-  .find-input:focus { border-color: #007acc; }
+  .find-input:focus { border-color: var(--c-accent); }
 
   /* ── Options ── */
   .options {
@@ -442,7 +442,7 @@
   }
 
   .direction-group {
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--c-border);
     border-radius: 5px;
     padding: 5px 10px 6px;
     display: flex;
@@ -452,7 +452,7 @@
 
   .opt-legend {
     font-size: 10.5px;
-    color: #666;
+    color: var(--c-dim);
     padding: 0 4px;
     user-select: none;
   }
@@ -462,12 +462,12 @@
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: #ccc;
+    color: var(--c-text2);
     cursor: pointer;
     user-select: none;
   }
 
-  .radio-label input { accent-color: #007acc; cursor: pointer; }
+  .radio-label input { accent-color: var(--c-accent); cursor: pointer; }
 
   .checkboxes {
     display: flex;
@@ -481,12 +481,12 @@
     align-items: center;
     gap: 5px;
     font-size: 12px;
-    color: #ccc;
+    color: var(--c-text2);
     cursor: pointer;
     user-select: none;
   }
 
-  .check-label input  { accent-color: #007acc; cursor: pointer; }
+  .check-label input  { accent-color: var(--c-accent); cursor: pointer; }
   .check-label.dimmed { opacity: 0.38; cursor: not-allowed; }
 
   /* ── Status messages ── */
@@ -497,15 +497,15 @@
     font-size: 11.5px;
   }
 
-  .msg.error { background: rgba(244, 71, 71, 0.15); color: #f47171; }
-  .msg.info  { background: rgba(0, 122, 204, 0.15); color: #9cdcfe; }
+  .msg.error { background: var(--c-err-bg); color: var(--c-err); }
+  .msg.info  { background: var(--c-accent-bg); color: var(--c-accent-t); }
 
   /* ── Results list ── */
   .results {
     max-height: 160px;
     overflow-y: auto;
-    border-top: 1px solid #3a3a3a;
-    border-bottom: 1px solid #3a3a3a;
+    border-top: 1px solid var(--c-border);
+    border-bottom: 1px solid var(--c-border);
     margin: 0 0 2px;
   }
 
@@ -517,18 +517,18 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    color: #9cdcfe;
+    color: var(--c-accent-t);
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 12px;
     transition: background 0.08s;
   }
 
-  .result-row:hover { background: #0e639c; color: #fff; }
+  .result-row:hover { background: var(--c-accent-b); color: #fff; }
 
   .results-more {
     padding: 3px 14px 5px;
     font-size: 11px;
-    color: #666;
+    color: var(--c-dim);
     font-style: italic;
   }
 
@@ -556,34 +556,11 @@
     transition: background 0.1s;
   }
 
-  .btn-ghost     { background: transparent; border: 1px solid #555; color: #aaa; }
-  .btn-secondary { background: #3a3a3a;     color: #d4d4d4; }
-  .btn-primary   { background: #0e639c;     color: #fff; }
+  .btn-ghost     { background: transparent; border: 1px solid var(--c-dim); color: var(--c-muted); }
+  .btn-secondary { background: var(--c-border);  color: var(--c-text); }
+  .btn-primary   { background: var(--c-accent-b); color: #fff; }
 
-  .btn-ghost:hover     { background: #3a3a3a; color: #e0e0e0; }
-  .btn-secondary:hover { background: #4a4a4a; }
-  .btn-primary:hover   { background: #1177bb; }
-
-  /* ── Light mode ── */
-  @media (prefers-color-scheme: light) {
-    .find-panel     { background: #f8f8f8; border-color: #d4d4d4; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
-    .panel-header   { border-bottom-color: #e0e0e0; }
-    .panel-title    { color: #1e1e1e; }
-    .close-btn      { color: #666; }
-    .close-btn:hover { background: #e8e8e8; color: #1e1e1e; }
-    .tab-bar        { border-bottom-color: #e0e0e0; }
-    .tab            { color: #666; }
-    .tab.active     { color: #0070c1; border-bottom-color: #0070c1; }
-    .find-input     { background: #fff; border-color: #ccc; color: #1e1e1e; }
-    .direction-group { border-color: #ddd; }
-    .opt-legend     { color: #999; }
-    .radio-label, .check-label { color: #333; }
-    .msg.info       { background: rgba(0,112,193,0.1); color: #0070c1; }
-    .results        { border-color: #e0e0e0; }
-    .result-row     { color: #0070c1; }
-    .btn-ghost      { border-color: #ccc; color: #555; }
-    .btn-ghost:hover { background: #eee; }
-    .btn-secondary  { background: #e8e8e8; color: #333; }
-    .btn-secondary:hover { background: #ddd; }
-  }
+  .btn-ghost:hover     { background: var(--c-hover); color: var(--c-text); }
+  .btn-secondary:hover { background: var(--c-hover); }
+  .btn-primary:hover   { background: var(--c-accent-h); }
 </style>

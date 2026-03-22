@@ -122,8 +122,8 @@
     flex-direction: column;
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 12px;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--c-bg);
+    color: var(--c-text);
     overflow: hidden;
   }
 
@@ -138,9 +138,9 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #888;
-    background: #252526;
-    border-bottom: 1px solid #3c3c3c;
+    color: var(--c-muted);
+    background: var(--c-surface);
+    border-bottom: 1px solid var(--c-hover);
     flex-shrink: 0;
     user-select: none;
   }
@@ -152,7 +152,7 @@
   .addr-chip {
     font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', monospace;
     font-size: 10.5px;
-    color: #569cd6;
+    color: var(--c-addr);
     font-weight: 400;
     letter-spacing: 0;
     text-transform: none;
@@ -176,7 +176,7 @@
   .close-btn {
     background: none;
     border: none;
-    color: #555;
+    color: var(--c-dim);
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
@@ -188,8 +188,8 @@
   }
 
   .close-btn:hover {
-    color: #ccc;
-    background: rgba(255, 255, 255, 0.08);
+    color: var(--c-text2);
+    background: var(--c-hover);
   }
 
   /* ── Raw byte strip ── */
@@ -198,12 +198,12 @@
     align-items: center;
     gap: 8px;
     padding: 4px 10px;
-    border-bottom: 1px solid #2a2a2a;
+    border-bottom: 1px solid var(--c-border);
     flex-shrink: 0;
   }
 
   .bytes-label {
-    color: #555;
+    color: var(--c-dim);
     font-family: 'Inter', sans-serif;
     font-size: 10px;
     text-transform: uppercase;
@@ -212,7 +212,7 @@
   }
 
   .bytes-val {
-    color: #9cdcfe;
+    color: var(--c-accent-t);
     font-size: 11px;
     letter-spacing: 0.04em;
     overflow: hidden;
@@ -235,7 +235,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #4a4a4a;
+    color: var(--c-border2);
     user-select: none;
   }
 
@@ -247,20 +247,20 @@
   }
 
   .insp-row:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--c-ec1);
   }
 
   .insp-label {
     flex-shrink: 0;
     width: 80px;
-    color: #666;
+    color: var(--c-dim);
     font-size: 11px;
     text-align: right;
   }
 
   .insp-value {
     flex: 1;
-    color: #d4d4d4;
+    color: var(--c-text);
     font-size: 11.5px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -268,24 +268,6 @@
   }
 
   .insp-value.na {
-    color: #3a3a3a;
-  }
-
-  /* ── Light mode ── */
-  @media (prefers-color-scheme: light) {
-    .inspector-panel     { background: #fff; color: #1e1e1e; }
-    .panel-header        { background: #f5f5f5; border-bottom-color: #d0d0d0; }
-    .addr-chip           { color: #0070c1; }
-    .addr-chip.pinned    { color: #d4562c; border-bottom-color: #d4562c; }
-    .close-btn           { color: #bbb; }
-    .close-btn:hover     { color: #666; background: rgba(0,0,0,0.06); }
-    .bytes-strip     { border-bottom-color: #eee; }
-    .bytes-label     { color: #bbb; }
-    .bytes-val       { color: #267f99; }
-    .group-hdr       { color: #ccc; }
-    .insp-row:hover  { background: rgba(0, 0, 0, 0.03); }
-    .insp-label      { color: #aaa; }
-    .insp-value      { color: #1e1e1e; }
-    .insp-value.na   { color: #ddd; }
+    color: var(--c-null-text);
   }
 </style>

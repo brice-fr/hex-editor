@@ -30,6 +30,22 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["hex", "ihex"],
+        "name": "Intel HEX File",
+        "description": "Intel HEX firmware file",
+        "mimeType": "text/x-ihex",
+        "role": "Editor"
+      },
+      {
+        "ext": ["srec", "s19", "s28", "s37", "mot"],
+        "name": "Motorola S-Record",
+        "description": "Motorola S-Record firmware file",
+        "mimeType": "text/x-srecord",
+        "role": "Editor"
+      }
     ]
   }
 }

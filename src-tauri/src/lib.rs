@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Brice LECOLE
 
 pub mod commands;
+pub mod file_assoc;
 pub mod file_operations;
 pub mod hex_parser;
 pub mod srec_parser;
@@ -18,6 +19,8 @@ pub fn run() {
             commands::detect_file_format,
             commands::save_file,
             commands::save_binary,
+            commands::get_file_associations,
+            commands::apply_file_associations,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
