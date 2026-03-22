@@ -572,7 +572,6 @@
     {:else if !currentFile}
       <span class="hint">Open a HEX, S-record or Binary file to get started</span>
     {/if}
-    <span style="margin-left:auto; opacity:0.7;">⬛ {dbgW}×{dbgH} · saved: {lsGet('windowW','?')}×{lsGet('windowH','?')}</span>
   </footer>
 </div>
 
