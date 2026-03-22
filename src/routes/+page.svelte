@@ -5,7 +5,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
-  import { PhysicalSize } from '@tauri-apps/api/dpi';
+  import { PhysicalSize, LogicalSize } from '@tauri-apps/api/dpi';
   import { Menu, Submenu, MenuItem, CheckMenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
   import { open, save, message } from '@tauri-apps/plugin-dialog';
   import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile, saveBinary, getStartupFile } from '$lib/api.js';
@@ -91,8 +91,15 @@
 
   let unlistenDragDrop;
   let unlistenOpenFile;
-  let unlistenResize;
   let resizeDebounce = null;
+
+  function onWindowResize() {
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(() => {
+      lsSet('windowW', window.outerWidth);
+      lsSet('windowH', window.outerHeight);
+    }, 400);
+  }
 
   // Address range of the loaded file (for GoToDialog validation)
   const addrRange = $derived((() => {
@@ -419,34 +426,26 @@
     }
 
     // ── Window size — restore from previous session ───────────────────────────
+    // Sizes stored/restored in logical (CSS) pixels to avoid DPR confusion.
     try {
       const savedW = parseInt(lsGet('windowW', '0'));
       const savedH = parseInt(lsGet('windowH', '0'));
       if (savedW > 100 && savedH > 100) {
-        // Only restore if the saved size fits within the current monitor
-        const monitor = await currentMonitor();
-        const screenW = monitor?.size.width  ?? Infinity;
-        const screenH = monitor?.size.height ?? Infinity;
+        // Guard: only restore if the saved size fits within the current screen
+        const screenW = window.screen.width;
+        const screenH = window.screen.height;
         if (savedW <= screenW && savedH <= screenH) {
-          await getCurrentWindow().setSize(new PhysicalSize(savedW, savedH));
+          await getCurrentWindow().setSize(new LogicalSize(savedW, savedH));
         }
       }
     } catch (e) {
       console.warn('Could not restore window size:', e);
     }
 
-    // ── Persist window size on every resize (Tauri native event) ─────────────
-    try {
-      unlistenResize = await getCurrentWindow().onResized(({ payload: size }) => {
-        clearTimeout(resizeDebounce);
-        resizeDebounce = setTimeout(() => {
-          lsSet('windowW', size.width);
-          lsSet('windowH', size.height);
-        }, 400);
-      });
-    } catch (e) {
-      console.warn('Could not set up resize listener:', e);
-    }
+    // ── Persist window size on every resize ──────────────────────────────────
+    // window.outerWidth/outerHeight are logical CSS pixels — consistent with
+    // LogicalSize used above and with screen.width used for the guard above.
+    window.addEventListener('resize', onWindowResize);
 
     // ── Drag-and-drop support ──
     try {
@@ -488,7 +487,7 @@
   onDestroy(() => {
     if (unlistenDragDrop) unlistenDragDrop();
     if (unlistenOpenFile) unlistenOpenFile();
-    if (unlistenResize) unlistenResize();
+    window.removeEventListener('resize', onWindowResize);
     clearTimeout(resizeDebounce);
   });
 </script>
