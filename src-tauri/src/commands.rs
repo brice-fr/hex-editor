@@ -59,6 +59,14 @@ pub fn save_file(records: Vec<RecordData>, path: String, format: String) -> Resu
     file_operations::write_file(&path, content.as_bytes())
 }
 
+/// Returns (and clears) the file path that was queued for opening at startup,
+/// either from a CLI argument (Windows/Linux) or a macOS Apple Event that fired
+/// before the webview was ready.  Returns `null` if no startup file was pending.
+#[tauri::command]
+pub fn get_startup_file(state: tauri::State<crate::StartupFile>) -> Option<String> {
+    state.0.lock().ok().and_then(|mut g| g.take())
+}
+
 #[tauri::command]
 pub async fn get_file_associations() -> Result<Vec<crate::file_assoc::AssocEntry>, String> {
     Ok(crate::file_assoc::get_associations())

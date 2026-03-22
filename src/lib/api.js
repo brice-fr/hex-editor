@@ -68,6 +68,15 @@ export async function saveBinary(records, path, fillByte) {
   return invoke('save_binary', { records, path, fillByte });
 }
 
+/**
+ * Returns (and clears) the startup file path queued by the Rust backend,
+ * or null if the app was not launched via a file-association double-click.
+ * @returns {Promise<string|null>}
+ */
+export async function getStartupFile() {
+  return invoke('get_startup_file');
+}
+
 export async function getFileAssociations() {
   return await invoke('get_file_associations');
 }

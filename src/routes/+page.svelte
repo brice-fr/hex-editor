@@ -3,12 +3,13 @@
 
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { PhysicalSize } from '@tauri-apps/api/dpi';
   import { Menu, Submenu, MenuItem, CheckMenuItem, PredefinedMenuItem } from '@tauri-apps/api/menu';
   import { open, save, message } from '@tauri-apps/plugin-dialog';
-  import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile, saveBinary } from '$lib/api.js';
+  import { openFile, parseIntelHex, parseSrec, detectFileFormat, saveFile, saveBinary, getStartupFile } from '$lib/api.js';
+  import { listen } from '@tauri-apps/api/event';
   import FileMenu from '$lib/components/FileMenu.svelte';
   import HexViewer from '$lib/components/HexViewer.svelte';
   import SegmentList   from '$lib/components/SegmentList.svelte';
@@ -89,18 +90,9 @@
   }
 
   let unlistenDragDrop;
+  let unlistenOpenFile;
+  let unlistenResize;
   let resizeDebounce = null;
-
-  async function onWindowResize() {
-    clearTimeout(resizeDebounce);
-    resizeDebounce = setTimeout(async () => {
-      try {
-        const sz = await getCurrentWindow().outerSize();
-        lsSet('windowW', sz.width);
-        lsSet('windowH', sz.height);
-      } catch { /* ignore — window may be closing */ }
-    }, 400);
-  }
 
   // Address range of the loaded file (for GoToDialog validation)
   const addrRange = $derived((() => {
@@ -431,12 +423,30 @@
       const savedW = parseInt(lsGet('windowW', '0'));
       const savedH = parseInt(lsGet('windowH', '0'));
       if (savedW > 100 && savedH > 100) {
-        await getCurrentWindow().setSize(new PhysicalSize(savedW, savedH));
+        // Only restore if the saved size fits within the current monitor
+        const monitor = await currentMonitor();
+        const screenW = monitor?.size.width  ?? Infinity;
+        const screenH = monitor?.size.height ?? Infinity;
+        if (savedW <= screenW && savedH <= screenH) {
+          await getCurrentWindow().setSize(new PhysicalSize(savedW, savedH));
+        }
       }
     } catch (e) {
       console.warn('Could not restore window size:', e);
     }
-    window.addEventListener('resize', onWindowResize);
+
+    // ── Persist window size on every resize (Tauri native event) ─────────────
+    try {
+      unlistenResize = await getCurrentWindow().onResized(({ payload: size }) => {
+        clearTimeout(resizeDebounce);
+        resizeDebounce = setTimeout(() => {
+          lsSet('windowW', size.width);
+          lsSet('windowH', size.height);
+        }, 400);
+      });
+    } catch (e) {
+      console.warn('Could not set up resize listener:', e);
+    }
 
     // ── Drag-and-drop support ──
     try {
@@ -456,11 +466,29 @@
     } catch (e) {
       console.warn('Drag-drop setup failed:', e);
     }
+
+    // ── OS file-association open ──────────────────────────────────────────────
+    // Warm launch: app already running, macOS sends the file via an event
+    try {
+      unlistenOpenFile = await listen('open-file', (event) => {
+        handleOpenPath(event.payload);
+      });
+    } catch (e) {
+      console.warn('open-file listener failed:', e);
+    }
+    // Cold launch: path was captured by Rust before the webview was ready
+    try {
+      const startupPath = await getStartupFile();
+      if (startupPath) handleOpenPath(startupPath);
+    } catch (e) {
+      console.warn('get_startup_file failed:', e);
+    }
   });
 
   onDestroy(() => {
     if (unlistenDragDrop) unlistenDragDrop();
-    window.removeEventListener('resize', onWindowResize);
+    if (unlistenOpenFile) unlistenOpenFile();
+    if (unlistenResize) unlistenResize();
     clearTimeout(resizeDebounce);
   });
 </script>
