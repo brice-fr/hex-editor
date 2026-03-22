@@ -96,8 +96,8 @@
   function onWindowResize() {
     clearTimeout(resizeDebounce);
     resizeDebounce = setTimeout(() => {
-      lsSet('windowW', window.outerWidth);
-      lsSet('windowH', window.outerHeight);
+      lsSet('windowW', window.innerWidth);
+      lsSet('windowH', window.innerHeight);
     }, 400);
   }
 
@@ -432,8 +432,9 @@
       const savedH = parseInt(lsGet('windowH', '0'));
       if (savedW > 100 && savedH > 100) {
         // Guard: only restore if the saved size fits within the current screen
-        const screenW = window.screen.width;
-        const screenH = window.screen.height;
+        // screen.availWidth/availHeight exclude the macOS dock/menu bar
+        const screenW = window.screen.availWidth;
+        const screenH = window.screen.availHeight;
         if (savedW <= screenW && savedH <= screenH) {
           await getCurrentWindow().setSize(new LogicalSize(savedW, savedH));
         }
