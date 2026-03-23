@@ -42,7 +42,7 @@ pub fn run() {
         .run(|app_handle, event| {
             // macOS sends RunEvent::Opened when the app is asked to open a file
             // via a file-association double-click (Apple Events / openFile:).
-            if let RunEvent::Opened { urls } = event {
+            if let tauri::RunEvent::Opened { urls } = event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
                         if let Some(path_str) = path.to_str() {
