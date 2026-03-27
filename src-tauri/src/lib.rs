@@ -8,7 +8,9 @@ pub mod hex_parser;
 pub mod srec_parser;
 
 use std::sync::Mutex;
-use tauri::{Emitter, Manager, RunEvent};
+use tauri::{Emitter, Manager};
+#[cfg(target_os = "macos")]
+use tauri::RunEvent;
 
 /// Holds the path of the file to open at startup (CLI arg on Windows/Linux,
 /// or macOS open-file Apple Event received before the webview is ready).
@@ -42,22 +44,23 @@ pub fn run() {
         .run(|app_handle, event| {
             // macOS sends RunEvent::Opened when the app is asked to open a file
             // via a file-association double-click (Apple Events / openFile:).
-            if let tauri::RunEvent::Opened { urls } = event {
+            // This variant only exists on macOS; other platforms use argv[1].
+            #[cfg(target_os = "macos")]
+            if let RunEvent::Opened { urls } = event {
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
                         if let Some(path_str) = path.to_str() {
-                            // Store the path so the frontend can retrieve it
-                            // on mount in case the webview wasn't ready yet.
                             if let Some(state) = app_handle.try_state::<StartupFile>() {
                                 if let Ok(mut guard) = state.0.lock() {
                                     *guard = Some(path_str.to_string());
                                 }
                             }
-                            // Also emit directly for warm launches (app already open)
                             let _ = app_handle.emit("open-file", path_str);
                         }
                     }
                 }
             }
+            #[cfg(not(target_os = "macos"))]
+            let _ = event;
         });
 }
