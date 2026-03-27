@@ -210,15 +210,22 @@
 
   // ── Minimap ──────────────────────────────────────────────────────────────
   const MINIMAP_W     = 16;
-  let minimapCanvas   = $state(/** @type {HTMLCanvasElement|null} */ (null));
-  let minimapH        = $state(0);
-  let minimapDragging = false;
+  let minimapCanvas     = $state(/** @type {HTMLCanvasElement|null} */ (null));
+  let minimapH          = $state(0);
+  let minimapMode       = 'none'; // 'none' | 'drag' | 'page'
+  let minimapDragOffset = 0;      // clientY offset within the band at drag start
+  let minimapScrollTimer = null;
+  let minimapScrollIntv  = null;
 
   function drawMinimap() {
     const canvas = minimapCanvas;
     if (!canvas || minimapH < 2) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    // Resize the canvas here (not via Svelte binding) so the size update and
+    // the draw happen in the same synchronous call — avoids a blank frame
+    // where Svelte's DOM update clears the canvas before $effect redraws it.
+    if (canvas.height !== minimapH) canvas.height = minimapH;
     const W = MINIMAP_W, H = minimapH, total = rows.length;
     if (total === 0) { ctx.clearRect(0, 0, W, H); return; }
 
@@ -253,19 +260,58 @@
   // Redraw whenever any dependency changes
   $effect(() => { void rows; void scrollTop; void clientHeight; void minimapH; void minimapCanvas; void ROW_HEIGHT; drawMinimap(); });
 
-  function onMinimapPointer(e) {
-    if (e.type === 'pointerdown') {
-      minimapDragging = true;
-      e.currentTarget.setPointerCapture(e.pointerId);
+  /** Returns the current viewport band geometry in minimap pixels. */
+  function minimapBand() {
+    const total = rows.length;
+    if (!total || !minimapH) return { top: 0, h: minimapH };
+    const visRows = Math.ceil(clientHeight / ROW_HEIGHT);
+    const topRow  = Math.floor(scrollTop / ROW_HEIGHT);
+    const top     = Math.round(topRow / total * minimapH);
+    const h       = Math.max(3, Math.round(visRows / total * minimapH));
+    return { top, h };
+  }
+
+  function onMinimapDown(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const { top, h } = minimapBand();
+    if (y >= top && y <= top + h) {
+      // Drag the band
+      minimapMode = 'drag';
+      minimapDragOffset = y - top;
+    } else {
+      // Page scroll above or below the band
+      minimapMode = 'page';
+      const dir = y < top ? -1 : 1;
+      if (scrollEl) scrollEl.scrollTop += dir * clientHeight;
+      minimapScrollTimer = setTimeout(() => {
+        minimapScrollIntv = setInterval(() => {
+          if (scrollEl) scrollEl.scrollTop += dir * clientHeight;
+        }, 80);
+      }, 350);
     }
-    if (e.type === 'pointerup' || e.type === 'pointercancel') {
-      minimapDragging = false;
-      return;
-    }
-    if (!minimapDragging) return;
-    const frac = Math.max(0, Math.min(1, e.offsetY / minimapH));
-    const targetRow = Math.floor(frac * rows.length);
-    if (scrollEl) scrollEl.scrollTop = targetRow * ROW_HEIGHT;
+  }
+
+  function onMinimapMove(e) {
+    if (minimapMode !== 'drag') return;
+    const total = rows.length;
+    if (!total || !minimapH) return;
+    const { h } = minimapBand();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const newTop = Math.max(0, Math.min(minimapH - h, y - minimapDragOffset));
+    const range  = minimapH - h;
+    const frac   = range > 0 ? newTop / range : 0;
+    if (scrollEl) scrollEl.scrollTop = frac * (scrollEl.scrollHeight - scrollEl.clientHeight);
+  }
+
+  function onMinimapUp() {
+    clearTimeout(minimapScrollTimer);
+    clearInterval(minimapScrollIntv);
+    minimapScrollTimer = null;
+    minimapScrollIntv  = null;
+    minimapMode = 'none';
   }
 
   // ── Scroll buttons ────────────────────────────────────────────────────────
@@ -403,12 +449,12 @@
         <div
           class="minimap-canvas-area"
           bind:clientHeight={minimapH}
-          onpointerdown={onMinimapPointer}
-          onpointermove={onMinimapPointer}
-          onpointerup={onMinimapPointer}
-          onpointercancel={onMinimapPointer}
+          onpointerdown={onMinimapDown}
+          onpointermove={onMinimapMove}
+          onpointerup={onMinimapUp}
+          onpointercancel={onMinimapUp}
         >
-          <canvas bind:this={minimapCanvas} width={MINIMAP_W} height={minimapH}></canvas>
+          <canvas bind:this={minimapCanvas} width={MINIMAP_W}></canvas>
         </div>
 
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->

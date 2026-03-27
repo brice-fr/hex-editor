@@ -8,9 +8,10 @@ pub mod hex_parser;
 pub mod srec_parser;
 
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
+
+// Emitter, Manager and RunEvent are only needed on macOS for the open-file handler.
 #[cfg(target_os = "macos")]
-use tauri::RunEvent;
+use tauri::{Emitter, Manager, RunEvent};
 
 /// Holds the path of the file to open at startup (CLI arg on Windows/Linux,
 /// or macOS open-file Apple Event received before the webview is ready).
@@ -60,7 +61,8 @@ pub fn run() {
                     }
                 }
             }
+            // Suppress unused-variable warnings on non-macOS targets
             #[cfg(not(target_os = "macos"))]
-            let _ = event;
+            let _ = (app_handle, event);
         });
 }
