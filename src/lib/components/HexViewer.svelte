@@ -3,7 +3,7 @@
 
 <script>
   /** @type {{ record_type: string; address: number; data: number[] }[]} */
-  let { records = [], bytesPerRow = 16, fontSize = 13, onScrolled = () => {}, onTopAddress = (_addr) => {}, onByteClick = (_addr) => {}, gotoTarget = null } = $props();
+  let { records = [], bytesPerRow = 16, fontSize = 13, onScrolled = () => {}, onTopAddress = (_addr) => {}, onByteClick = (_addr) => {}, onSelectionChange = (_sel) => {}, gotoTarget = null } = $props();
 
   const ROW_HEIGHT = $derived(fontSize + 7);
   const OVERSCAN   = 8;
@@ -156,6 +156,133 @@
   function isPrint(b) { return b !== null && b >= 0x20 && b < 0x7f; }
 
   const COLS = $derived(Array.from({ length: bytesPerRow }, (_, i) => i));
+
+  // ── Selection ────────────────────────────────────────────────────────────
+  let selAnchor  = $state(/** @type {number|null} */ (null));
+  let selFocus   = $state(/** @type {number|null} */ (null));
+  let isDragging = false;
+
+  const selMin   = $derived(selAnchor !== null && selFocus !== null ? Math.min(selAnchor, selFocus) : null);
+  const selMax   = $derived(selAnchor !== null && selFocus !== null ? Math.max(selAnchor, selFocus) : null);
+  const selCount = $derived(selMin !== null ? selMax - selMin + 1 : 0);
+
+  // Notify parent whenever selection changes (focus = last byte cursor touched)
+  $effect(() => {
+    onSelectionChange(selMin !== null ? { start: selMin, end: selMax, count: selCount, focus: selFocus } : null);
+  });
+
+  // Clear selection when file changes
+  $effect(() => { void records; selAnchor = null; selFocus = null; });
+
+  function onScrollPointerDown(e) {
+    if (e.button !== 0) return;
+    const byteEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-addr]');
+    if (!byteEl) { selAnchor = null; selFocus = null; return; }
+    const addr = parseInt(/** @type {HTMLElement} */ (byteEl).dataset.addr ?? '');
+    if (isNaN(addr)) return;
+    // Toggle off: re-clicking the same single-byte selection clears it
+    if (!e.shiftKey && selAnchor === addr && selFocus === addr) {
+      selAnchor = null; selFocus = null; return;
+    }
+    if (e.shiftKey && selAnchor !== null) {
+      selFocus = addr;
+    } else {
+      selAnchor = addr;
+      selFocus  = addr;
+    }
+    isDragging = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onScrollPointerMove(e) {
+    if (!isDragging) return;
+    const byteEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-addr]');
+    if (byteEl) {
+      const addr = parseInt(/** @type {HTMLElement} */ (byteEl).dataset.addr ?? '');
+      if (!isNaN(addr)) selFocus = addr;
+    }
+  }
+
+  function onScrollPointerUp() { isDragging = false; }
+
+  /** Clear selection — called from parent via Escape */
+  export function clearSelection() { selAnchor = null; selFocus = null; }
+
+  // ── Minimap ──────────────────────────────────────────────────────────────
+  const MINIMAP_W     = 16;
+  let minimapCanvas   = $state(/** @type {HTMLCanvasElement|null} */ (null));
+  let minimapH        = $state(0);
+  let minimapDragging = false;
+
+  function drawMinimap() {
+    const canvas = minimapCanvas;
+    if (!canvas || minimapH < 2) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = MINIMAP_W, H = minimapH, total = rows.length;
+    if (total === 0) { ctx.clearRect(0, 0, W, H); return; }
+
+    // Per-pixel row fill
+    const img = ctx.createImageData(W, H);
+    const px  = img.data;
+    for (let py = 0; py < H; py++) {
+      const ri     = Math.min(total - 1, Math.floor(py / H * total));
+      const isData = rows[ri].type === 'data';
+      const r = isData ? 74  : 36;
+      const g = isData ? 144 : 36;
+      const b = isData ? 226 : 40;
+      for (let x = 0; x < W; x++) {
+        const i = (py * W + x) * 4;
+        px[i] = r; px[i+1] = g; px[i+2] = b; px[i+3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // Viewport band
+    const visRows = Math.ceil(clientHeight / ROW_HEIGHT);
+    const topRow  = Math.floor(scrollTop / ROW_HEIGHT);
+    const bandTop = Math.round(topRow / total * H);
+    const bandH   = Math.max(3, Math.round(visRows / total * H));
+    ctx.fillStyle   = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(0, bandTop, W, bandH);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth   = 1;
+    ctx.strokeRect(0.5, bandTop + 0.5, W - 1, bandH - 1);
+  }
+
+  // Redraw whenever any dependency changes
+  $effect(() => { void rows; void scrollTop; void clientHeight; void minimapH; void minimapCanvas; void ROW_HEIGHT; drawMinimap(); });
+
+  function onMinimapPointer(e) {
+    if (e.type === 'pointerdown') {
+      minimapDragging = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    if (e.type === 'pointerup' || e.type === 'pointercancel') {
+      minimapDragging = false;
+      return;
+    }
+    if (!minimapDragging) return;
+    const frac = Math.max(0, Math.min(1, e.offsetY / minimapH));
+    const targetRow = Math.floor(frac * rows.length);
+    if (scrollEl) scrollEl.scrollTop = targetRow * ROW_HEIGHT;
+  }
+
+  // ── Scroll buttons ────────────────────────────────────────────────────────
+  let scrollBtnInterval = null;
+
+  function startScrollBtn(dir) {
+    if (scrollEl) scrollEl.scrollTop += dir * ROW_HEIGHT * 3;
+    scrollBtnInterval = setInterval(() => {
+      if (scrollEl) scrollEl.scrollTop += dir * ROW_HEIGHT * 3;
+    }, 80);
+  }
+
+  function stopScrollBtn() {
+    if (scrollBtnInterval) { clearInterval(scrollBtnInterval); scrollBtnInterval = null; }
+  }
+
+  $effect(() => () => stopScrollBtn());
 </script>
 
 <div class="hex-viewer" style="font-size:{fontSize}px">
@@ -164,7 +291,8 @@
   {:else}
 
     <!-- ── Sticky header ── -->
-    <div class="hex-header">
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div class="hex-header" onpointerdown={() => { selAnchor = null; selFocus = null; }}>
       <span class="col-addr">Address</span>
       <span class="v-sep"></span>
       <span class="col-hex-area">
@@ -181,67 +309,119 @@
       </span>
     </div>
 
-    <!-- ── Virtual-scroll container ── -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div
-      class="hex-scroll"
-      role="grid"
-      aria-rowcount={rows.length}
-      onscroll={onScroll}
-      bind:clientHeight
-      bind:this={scrollEl}
-    >
-      <div class="scroll-space" style="height:{totalHeight}px;">
-        <div class="visible-rows" style="top:{offsetTop}px;">
-          {#each visibleRows as row (row.id)}
-            {#if row.type === 'gap'}
-              <div class="gap-row" style="height:{ROW_HEIGHT}px;">
-                <div class="gap-line"></div>
-                <span class="gap-label">gap: 0x{row.gapBytes.toString(16).toUpperCase()} bytes ({row.gapBytes}) · {hex32(row.fromAddr)} – {hex32(row.toAddr - 1)}</span>
-                <div class="gap-line"></div>
-              </div>
-            {:else}
-              {@const pad = bytesPerRow - row.bytes.length}
-              <div class="hex-row" role="row" style="height:{ROW_HEIGHT}px;">
+    <!-- ── Scroll area + minimap ── -->
+    <div class="scroll-and-minimap">
 
-                <span class="col-addr">{hex32(row.address)}</span>
-                <span class="v-sep"></span>
+      <!-- ── Virtual-scroll container ── -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="hex-scroll"
+        role="grid"
+        aria-rowcount={rows.length}
+        onscroll={onScroll}
+        onpointerdown={onScrollPointerDown}
+        onpointermove={onScrollPointerMove}
+        onpointerup={onScrollPointerUp}
+        bind:clientHeight
+        bind:this={scrollEl}
+      >
+        <div class="scroll-space" style="height:{totalHeight}px;">
+          <div class="visible-rows" style="top:{offsetTop}px;">
+            {#each visibleRows as row (row.id)}
+              {#if row.type === 'gap'}
+                <div class="gap-row" style="height:{ROW_HEIGHT}px;">
+                  <div class="gap-line"></div>
+                  <span class="gap-label">gap: 0x{row.gapBytes.toString(16).toUpperCase()} bytes ({row.gapBytes}) · {hex32(row.fromAddr)} – {hex32(row.toAddr - 1)}</span>
+                  <div class="gap-line"></div>
+                </div>
+              {:else}
+                {@const pad = bytesPerRow - row.bytes.length}
+                <div class="hex-row" role="row" style="height:{ROW_HEIGHT}px;">
 
-                <span class="col-hex-area">
-                  {#each row.bytes as byte, i}
-                    {#if i === 8}<span class="mid-gap"></span>{/if}
-                    {#if byte === null}
-                      <span class="hb ec-{i % 2} blank">__</span>
-                    {:else}
-                      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                      <span class="hb ec-{i % 2} clickable" onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}>{hex8(byte)}</span>
-                    {/if}
-                  {/each}
-                  {#each { length: pad } as _, i}
-                    {@const col = row.bytes.length + i}
-                    {#if col === 8}<span class="mid-gap"></span>{/if}
-                    <span class="hb ec-{col % 2} pad"></span>
-                  {/each}
-                </span>
+                  <span class="col-addr">{hex32(row.address)}</span>
+                  <span class="v-sep"></span>
 
-                <span class="v-sep"></span>
-                <span class="col-ascii-area">
-                  {#each row.bytes as byte, i}
-                    {#if byte === null}
-                      <span class="ac blank">·</span>
-                    {:else}
-                      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                      <span class="ac clickable" class:np={!isPrint(byte)} onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}>{toAscii(byte)}</span>
-                    {/if}
-                  {/each}
-                </span>
+                  <span class="col-hex-area">
+                    {#each row.bytes as byte, i}
+                      {#if i === 8}<span class="mid-gap"></span>{/if}
+                      {#if byte === null}
+                        <span class="hb ec-{i % 2} blank">__</span>
+                      {:else}
+                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                        <span
+                          class="hb ec-{i % 2} clickable"
+                          class:sel={selMin !== null && selMin <= row.address + i && row.address + i <= selMax}
+                          data-addr={row.address + i}
+                          onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}
+                        >{hex8(byte)}</span>
+                      {/if}
+                    {/each}
+                    {#each { length: pad } as _, i}
+                      {@const col = row.bytes.length + i}
+                      {#if col === 8}<span class="mid-gap"></span>{/if}
+                      <span class="hb ec-{col % 2} pad"></span>
+                    {/each}
+                  </span>
 
-              </div>
-            {/if}
-          {/each}
+                  <span class="v-sep"></span>
+                  <span class="col-ascii-area">
+                    {#each row.bytes as byte, i}
+                      {#if byte === null}
+                        <span class="ac blank">·</span>
+                      {:else}
+                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                        <span
+                          class="ac clickable"
+                          class:sel={selMin !== null && selMin <= row.address + i && row.address + i <= selMax}
+                          class:np={!isPrint(byte)}
+                          data-addr={row.address + i}
+                          onclick={(e) => { e.stopPropagation(); onByteClick(row.address + i); }}
+                        >{toAscii(byte)}</span>
+                      {/if}
+                    {/each}
+                  </span>
+
+                </div>
+              {/if}
+            {/each}
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- ── Minimap ── -->
+      <div class="minimap-wrap">
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <button
+          class="scroll-btn"
+          onpointerdown={() => startScrollBtn(-1)}
+          onpointerup={stopScrollBtn}
+          onpointerleave={stopScrollBtn}
+          onpointercancel={stopScrollBtn}
+        >▲</button>
+
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="minimap-canvas-area"
+          bind:clientHeight={minimapH}
+          onpointerdown={onMinimapPointer}
+          onpointermove={onMinimapPointer}
+          onpointerup={onMinimapPointer}
+          onpointercancel={onMinimapPointer}
+        >
+          <canvas bind:this={minimapCanvas} width={MINIMAP_W} height={minimapH}></canvas>
+        </div>
+
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <button
+          class="scroll-btn"
+          onpointerdown={() => startScrollBtn(1)}
+          onpointerup={stopScrollBtn}
+          onpointerleave={stopScrollBtn}
+          onpointercancel={stopScrollBtn}
+        >▼</button>
+      </div>
+
+    </div><!-- /scroll-and-minimap -->
 
     <div class="row-count">
       {dataRowCount.toLocaleString()} rows &nbsp;·&nbsp; {totalDataBytes.toLocaleString()} bytes
@@ -274,12 +454,80 @@
     color: var(--c-dim);
   }
 
+  /* ── Scroll + minimap wrapper ── */
+  .scroll-and-minimap {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
   /* ── Scroll container ── */
   .hex-scroll {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: auto;
     position: relative;
+    scrollbar-width: none; /* Firefox */
+    user-select: none;
+  }
+  .hex-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+  /* ── Minimap ── */
+  .minimap-wrap {
+    width: 16px;
+    flex-shrink: 0;
+    background: var(--c-surface);
+    border-left: 1px solid var(--c-border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .minimap-canvas-area {
+    flex: 1;
+    overflow: hidden;
+    cursor: ns-resize;
+    user-select: none;
+  }
+
+  .minimap-canvas-area canvas {
+    display: block;
+  }
+
+  .scroll-btn {
+    width: 100%;
+    height: 16px;
+    flex-shrink: 0;
+    background: var(--c-surface);
+    border: none;
+    border-color: var(--c-border);
+    color: var(--c-dim);
+    font-size: 7px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  .scroll-btn:first-child {
+    border-bottom: 1px solid var(--c-border);
+  }
+
+  .scroll-btn:last-child {
+    border-top: 1px solid var(--c-border);
+  }
+
+  .scroll-btn:hover {
+    background: var(--c-hover);
+    color: var(--c-text);
+  }
+
+  .scroll-btn:active {
+    background: var(--c-accent-b);
+    color: #fff;
   }
 
   .scroll-space {
@@ -399,6 +647,14 @@
   /* Non-printable dot */
   .ac.np {
     color: var(--c-border2);
+  }
+
+  /* ── Selection ── */
+  .hb.sel,
+  .ac.sel {
+    background: var(--c-sel) !important;
+    color: var(--c-sel-text) !important;
+    border-radius: 2px;
   }
 
   /* Gap separator row */

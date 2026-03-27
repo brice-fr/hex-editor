@@ -89,6 +89,12 @@
     inspectorPinned  = true;
   }
 
+  let hexSelection = $state(/** @type {{start:number,end:number,count:number,focus:number}|null} */ (null));
+  function handleSelectionChange(sel) {
+    hexSelection = sel;
+    if (sel) { inspectorAddress = sel.focus; inspectorPinned = true; }
+  }
+
   let unlistenDragDrop;
   let unlistenOpenFile;
   let resizeDebounce = null;
@@ -538,6 +544,7 @@
         onScrolled={() => { if (!loading && !saving) status = ''; }}
         onTopAddress={(addr) => { hexTopAddress = addr; }}
         onByteClick={handleByteClick}
+        onSelectionChange={handleSelectionChange}
       />
     </main>
 
@@ -572,6 +579,13 @@
     {:else if !currentFile}
       <span class="hint">Open a HEX, S-record or Binary file to get started</span>
     {/if}
+    {#if hexSelection}
+      <span class="sel-info">
+        Sel&nbsp;{hexSelection.start.toString(16).padStart(8,'0').toUpperCase()}
+        –&nbsp;{hexSelection.end.toString(16).padStart(8,'0').toUpperCase()}
+        &nbsp;·&nbsp;{hexSelection.count.toLocaleString()} byte{hexSelection.count === 1 ? '' : 's'}
+      </span>
+    {/if}
   </footer>
 </div>
 
@@ -602,6 +616,8 @@
     --c-ec0:       transparent;
     --c-ec1:       rgba(255,255,255,0.03);
     --c-header-bg: #1e1e1e;
+    --c-sel:       rgba(58,110,165,0.60);
+    --c-sel-text:  #ffffff;
   }
 
   @media (prefers-color-scheme: light) {
@@ -631,6 +647,8 @@
       --c-ec0:       transparent;
       --c-ec1:       rgba(0,0,0,0.03);
       --c-header-bg: #f3f3f3;
+      --c-sel:       rgba(0,95,204,0.22);
+      --c-sel-text:  #1a1a1a;
     }
   }
 
@@ -660,6 +678,8 @@
     --c-ec0:       transparent;
     --c-ec1:       rgba(0,0,0,0.03);
     --c-header-bg: #f3f3f3;
+    --c-sel:       rgba(0,95,204,0.22);
+    --c-sel-text:  #1a1a1a;
   }
 
   :global(*, *::before, *::after) {
@@ -743,6 +763,13 @@
 
   .statusbar .hint {
     opacity: 0.75;
+  }
+
+  .statusbar .sel-info {
+    margin-left: auto;
+    opacity: 0.9;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
   }
 
   /* Drag-and-drop overlay */
