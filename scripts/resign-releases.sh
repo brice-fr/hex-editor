@@ -45,10 +45,13 @@ else
   TAGS=(v0.2.0 v0.2.1 v0.2.2)
 fi
 
-# Commits to revert per tag before building (comma-separated)
-declare -A TAG_REVERTS=(
-  ["v0.2.0"]="b913542"
-)
+# Returns commits to revert (comma-separated) for a given tag, or empty string
+tag_reverts() {
+  case "$1" in
+    v0.2.0) echo "b913542" ;;
+    *)      echo "" ;;
+  esac
+}
 
 # Source Rust + Node toolchains
 source "$HOME/.cargo/env"
@@ -86,8 +89,9 @@ for TAG in "${TAGS[@]}"; do
   git -C "$REPO_ROOT" worktree add --detach "$WORK_DIR" "$TAG"
 
   # Apply any required reverts on top of the tag (worktree only, not permanent)
-  if [[ -n "${TAG_REVERTS[$TAG]:-}" ]]; then
-    IFS=',' read -ra REVERTS <<< "${TAG_REVERTS[$TAG]}"
+  REVERTS_FOR_TAG="$(tag_reverts "$TAG")"
+  if [[ -n "$REVERTS_FOR_TAG" ]]; then
+    IFS=',' read -ra REVERTS <<< "$REVERTS_FOR_TAG"
     for COMMIT in "${REVERTS[@]}"; do
       info "Reverting $COMMIT on $TAG …"
       git -C "$WORK_DIR" revert --no-edit "$COMMIT"
