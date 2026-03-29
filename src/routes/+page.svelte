@@ -366,19 +366,6 @@
               await PredefinedMenuItem.new({ item: 'CloseWindow' }),
             ],
           }),
-          // ③ Edit
-          await Submenu.new({
-            text: 'Edit',
-            items: [
-              await PredefinedMenuItem.new({ item: 'Undo' }),
-              await PredefinedMenuItem.new({ item: 'Redo' }),
-              await PredefinedMenuItem.new({ item: 'Separator' }),
-              await PredefinedMenuItem.new({ item: 'Cut' }),
-              await PredefinedMenuItem.new({ item: 'Copy' }),
-              await PredefinedMenuItem.new({ item: 'Paste' }),
-              await PredefinedMenuItem.new({ item: 'SelectAll' }),
-            ],
-          }),
           // ④ Search
           await Submenu.new({
             text: 'Search',
