@@ -39,15 +39,21 @@ fi
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TAGS=("${@:-v0.2.0 v0.2.1 v0.2.2}")
-ORIGINAL_BRANCH=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
+if [[ $# -gt 0 ]]; then
+  TAGS=("$@")
+else
+  TAGS=(v0.2.0 v0.2.1 v0.2.2)
+fi
+
+# Commits to revert per tag before building (comma-separated)
+declare -A TAG_REVERTS=(
+  ["v0.2.0"]="b913542"
+)
 
 # Source Rust + Node toolchains
 source "$HOME/.cargo/env"
 export NVM_DIR="$HOME/.nvm"
 [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
-
-cd "$REPO_ROOT"
 
 # ── Process each tag ──────────────────────────────────────────────────────────
 for TAG in "${TAGS[@]}"; do
@@ -55,66 +61,78 @@ for TAG in "${TAGS[@]}"; do
   info "Processing tag: $TAG"
   info "══════════════════════════════════════════"
 
-  # Extract semver from tag (strip leading 'v')
   VERSION="${TAG#v}"
+  WORK_DIR=$(mktemp -d)
   DMG_NAME="hex-editor_${VERSION}_aarch64.dmg"
-  DMG_PATH="$REPO_ROOT/src-tauri/target/release/bundle/dmg/$DMG_NAME"
+  DMG_PATH="$WORK_DIR/src-tauri/target/release/bundle/dmg/$DMG_NAME"
+
+  # Cleanup worktree on exit/error
+  cleanup() {
+    info "Cleaning up worktree …"
+    git -C "$REPO_ROOT" worktree remove --force "$WORK_DIR" 2>/dev/null || true
+    rm -rf "$WORK_DIR"
+  }
+  trap cleanup EXIT
 
   # Check the tag exists
-  if ! git rev-parse "$TAG" &>/dev/null; then
-    warn "Tag $TAG not found locally — skipping"
+  if ! git -C "$REPO_ROOT" rev-parse "$TAG" &>/dev/null; then
+    warn "Tag $TAG not found locally — skipping (run: git fetch --tags)"
+    trap - EXIT; cleanup
     continue
   fi
 
-  # Check the GitHub release exists
-  if ! gh release view "$TAG" &>/dev/null; then
-    warn "No GitHub release found for $TAG — skipping upload (build will still run)"
+  # Create an isolated worktree for this tag (main working dir is untouched)
+  info "Creating worktree for $TAG at $WORK_DIR …"
+  git -C "$REPO_ROOT" worktree add --detach "$WORK_DIR" "$TAG"
+
+  # Apply any required reverts on top of the tag (worktree only, not permanent)
+  if [[ -n "${TAG_REVERTS[$TAG]:-}" ]]; then
+    IFS=',' read -ra REVERTS <<< "${TAG_REVERTS[$TAG]}"
+    for COMMIT in "${REVERTS[@]}"; do
+      info "Reverting $COMMIT on $TAG …"
+      git -C "$WORK_DIR" revert --no-edit "$COMMIT"
+    done
   fi
 
-  # Stash any uncommitted changes, check out tag
-  git stash --quiet 2>/dev/null || true
-  info "Checking out $TAG …"
-  git checkout --quiet "$TAG"
+  # Build
+  info "Installing npm dependencies …"
+  (cd "$WORK_DIR" && npm install --silent)
 
-  # Clean previous bundle artifacts to avoid stale DMG
-  rm -f "$DMG_PATH"
-
-  # Build with signing
-  info "Building $TAG (this includes notarization — may take a few minutes) …"
-  npm install --silent
-  npm run tauri build
+  info "Building $TAG with signing + notarization (may take a few minutes) …"
+  (cd "$WORK_DIR" && npm run tauri build)
 
   # Verify DMG was produced
   if [[ ! -f "$DMG_PATH" ]]; then
-    error "DMG not found at expected path: $DMG_PATH"
+    error "DMG not found: $DMG_PATH"
     error "Check build output above. Skipping upload for $TAG."
-    git checkout --quiet "$ORIGINAL_BRANCH"
+    trap - EXIT; cleanup
     continue
   fi
 
-  # Verify the app is signed and notarized
+  # Verify signature
   info "Verifying signature …"
-  APP_PATH="$REPO_ROOT/src-tauri/target/release/bundle/macos/hex-editor.app"
-  if codesign -dv --verbose=2 "$APP_PATH" 2>&1 | grep -q "Developer ID Application"; then
-    info "Signature OK"
+  APP_PATH="$WORK_DIR/src-tauri/target/release/bundle/macos/hex-editor.app"
+  if codesign -dv "$APP_PATH" 2>&1 | grep -q "Developer ID Application"; then
+    info "Signature OK ✓"
   else
-    warn "Signature check inconclusive — inspect manually with: codesign -dv $APP_PATH"
+    warn "Signature check inconclusive — inspect manually: codesign -dv \"$APP_PATH\""
   fi
 
   # Upload to GitHub release
   if gh release view "$TAG" &>/dev/null; then
     info "Uploading $DMG_NAME to GitHub release $TAG …"
     gh release upload "$TAG" "$DMG_PATH" --clobber
-    info "Uploaded successfully."
+    info "Uploaded ✓"
   else
-    warn "Skipping upload — no GitHub release for $TAG"
+    warn "No GitHub release found for $TAG — skipping upload"
+    warn "DMG is at: $DMG_PATH (copy it before this script exits)"
+    read -r -p "Press Enter to continue (and delete the worktree) …"
   fi
 
-  # Return to original branch before next iteration
-  git checkout --quiet "$ORIGINAL_BRANCH"
+  trap - EXIT
+  cleanup
 done
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 info "══════════════════════════════════════════"
-info "All done. Returning to branch: $ORIGINAL_BRANCH"
-git checkout --quiet "$ORIGINAL_BRANCH"
+info "All done."
