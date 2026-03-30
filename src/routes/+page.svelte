@@ -605,6 +605,8 @@
     --c-header-bg: #1e1e1e;
     --c-sel:       rgba(58,110,165,0.60);
     --c-sel-text:  #ffffff;
+    --c-scrollbar-thumb:  #000000;
+    --c-scrollbar-track:  #2d2d2d;
   }
 
   @media (prefers-color-scheme: light) {
@@ -636,6 +638,8 @@
       --c-header-bg: #f3f3f3;
       --c-sel:       rgba(0,95,204,0.22);
       --c-sel-text:  #1a1a1a;
+      --c-scrollbar-thumb:  #777777;
+      --c-scrollbar-track:  #d4d4d4;
     }
   }
 

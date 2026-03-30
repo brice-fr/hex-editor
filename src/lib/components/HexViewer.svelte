@@ -97,6 +97,7 @@
   const offsetTop   = $derived(startIdx * ROW_HEIGHT);
 
   let scrollEl         = $state(null);
+  let headerEl         = $state(null);
   let suppressScrolled = false;
 
   // Throttle state — plain vars, not reactive (no re-render needed)
@@ -111,6 +112,8 @@
 
   function onScroll(e) {
     rawScrollTop = e.currentTarget.scrollTop;
+    // Keep header horizontally in sync with content
+    if (headerEl) headerEl.scrollLeft = e.currentTarget.scrollLeft;
     if (!suppressScrolled) onScrolled(); // user-initiated only
 
     if (throttleId === null) {
@@ -336,43 +339,45 @@
     <p class="empty-state">No data to display. Open an Intel HEX or S-record file.</p>
   {:else}
 
-    <!-- ── Sticky header ── -->
-    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-    <div class="hex-header" onpointerdown={() => { selAnchor = null; selFocus = null; }}>
-      <span class="col-addr">Address</span>
-      <span class="v-sep"></span>
-      <span class="col-hex-area">
-        {#each COLS as i}
-          {#if i === 8}<span class="mid-gap"></span>{/if}
-          <span class="hb ec-{i % 2}">{i.toString(16).padStart(2, '0').toUpperCase()}</span>
-        {/each}
-      </span>
-      <span class="v-sep"></span>
-      <span class="col-ascii-area">
-        {#each COLS as i}
-          <span class="ac">{i.toString(16).toUpperCase()}</span>
-        {/each}
-      </span>
-    </div>
-
     <!-- ── Scroll area + minimap ── -->
     <div class="scroll-and-minimap">
 
-      <!-- ── Virtual-scroll container ── -->
-      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-      <div
-        class="hex-scroll"
-        role="grid"
-        aria-rowcount={rows.length}
-        onscroll={onScroll}
-        onpointerdown={onScrollPointerDown}
-        onpointermove={onScrollPointerMove}
-        onpointerup={onScrollPointerUp}
-        bind:clientHeight
-        bind:this={scrollEl}
-      >
-        <div class="scroll-space" style="height:{totalHeight}px;">
-          <div class="visible-rows" style="top:{offsetTop}px;">
+      <!-- ── Left column: header + scrollable content ── -->
+      <div class="hex-left">
+
+        <!-- ── Column header (scrolls horizontally in sync with content) ── -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div class="hex-header" bind:this={headerEl} onpointerdown={() => { selAnchor = null; selFocus = null; }}>
+          <span class="col-addr">Address</span>
+          <span class="v-sep"></span>
+          <span class="col-hex-area">
+            {#each COLS as i}
+              {#if i > 0 && i % 8 === 0}<span class="mid-gap"></span>{/if}
+              <span class="hb ec-{i % 2}">{i.toString(16).padStart(2, '0').toUpperCase()}</span>
+            {/each}
+          </span>
+          <span class="v-sep"></span>
+          <span class="col-ascii-area">
+            {#each COLS as i}
+              <span class="ac">{(i % 16).toString(16).toUpperCase()}</span>
+            {/each}
+          </span>
+        </div>
+
+        <!-- ── Virtual-scroll container ── -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="hex-scroll"
+          role="grid"
+          aria-rowcount={rows.length}
+          onscroll={onScroll}
+          onpointerdown={onScrollPointerDown}
+          onpointermove={onScrollPointerMove}
+          onpointerup={onScrollPointerUp}
+          bind:clientHeight
+          bind:this={scrollEl}
+        >
+          <div class="scroll-space" style="height:{totalHeight}px; padding-top:{offsetTop}px;">
             {#each visibleRows as row (row.id)}
               {#if row.type === 'gap'}
                 <div class="gap-row" style="height:{ROW_HEIGHT}px;">
@@ -389,7 +394,7 @@
 
                   <span class="col-hex-area">
                     {#each row.bytes as byte, i}
-                      {#if i === 8}<span class="mid-gap"></span>{/if}
+                      {#if i > 0 && i % 8 === 0}<span class="mid-gap"></span>{/if}
                       {#if byte === null}
                         <span class="hb ec-{i % 2} blank">__</span>
                       {:else}
@@ -404,7 +409,7 @@
                     {/each}
                     {#each { length: pad } as _, i}
                       {@const col = row.bytes.length + i}
-                      {#if col === 8}<span class="mid-gap"></span>{/if}
+                      {#if col > 0 && col % 8 === 0}<span class="mid-gap"></span>{/if}
                       <span class="hb ec-{col % 2} pad"></span>
                     {/each}
                   </span>
@@ -432,7 +437,8 @@
             {/each}
           </div>
         </div>
-      </div>
+
+      </div><!-- /hex-left -->
 
       <!-- ── Minimap ── -->
       <div class="minimap-wrap">
@@ -487,7 +493,24 @@
     background: var(--c-bg);
   }
 
-  /* ── Header ── */
+  /* ── Scroll + minimap wrapper ── */
+  .scroll-and-minimap {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Left column: header + scroll ── */
+  .hex-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* ── Header (scrolls horizontally in sync via JS scrollLeft) ── */
   .hex-header {
     display: flex;
     align-items: stretch;
@@ -498,26 +521,31 @@
     font-weight: 400;
     letter-spacing: 0;
     color: var(--c-dim);
-  }
-
-  /* ── Scroll + minimap wrapper ── */
-  .scroll-and-minimap {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    min-height: 0;
+    overflow: hidden; /* hide header scrollbar; scrollLeft synced via JS */
   }
 
   /* ── Scroll container ── */
   .hex-scroll {
     flex: 1;
+    /* Push element 20px past hex-left's overflow:hidden boundary so the
+       vertical scrollbar (if any) is clipped and invisible, while
+       padding-right restores the content area to the same width as the
+       header — fixing the header-sync-not-all-the-way bug. */
+    margin-right: -20px;
+    padding-right: 20px;
+    box-sizing: border-box;
     overflow-y: scroll;
     overflow-x: auto;
-    position: relative;
-    scrollbar-width: none; /* Firefox */
     user-select: none;
+    /* Firefox: show only horizontal bar — thumb on track matching theme */
+    scrollbar-width: thin;
+    scrollbar-color: var(--c-scrollbar-thumb) var(--c-scrollbar-track);
   }
-  .hex-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+  /* WebKit: style horizontal scrollbar only; vertical is clipped by parent */
+  .hex-scroll::-webkit-scrollbar          { height: 8px; }
+  .hex-scroll::-webkit-scrollbar-track    { background: var(--c-scrollbar-track); }
+  .hex-scroll::-webkit-scrollbar-thumb    { background: var(--c-scrollbar-thumb); border-radius: 4px; }
+  .hex-scroll::-webkit-scrollbar-thumb:hover { background: var(--c-scrollbar-thumb); opacity: 0.8; }
 
   /* ── Minimap ── */
   .minimap-wrap {
@@ -577,14 +605,9 @@
   }
 
   .scroll-space {
-    position: relative;
-    width: 100%;
-  }
-
-  .visible-rows {
-    position: absolute;
-    left: 0;
-    right: 0;
+    box-sizing: border-box;
+    min-width: max-content; /* expand to row width so horizontal scroll triggers */
+    padding-right: 8px;     /* breathing room so last ASCII char is fully reachable */
   }
 
   /* ── Row ── */

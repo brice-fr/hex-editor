@@ -41,6 +41,27 @@
     return parseFloat(v.toPrecision(10)).toString();
   }
 
+  /** Decode bytes (number|null)[] as UTF-8 up to the first null byte or unmapped slot */
+  function decodeUtf8String(b) {
+    const stop = b.findIndex(x => x === null || x === 0);
+    const slice = (stop >= 0 ? b.slice(0, stop) : b).filter(x => x !== null);
+    if (slice.length === 0) return '(empty)';
+    return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(slice));
+  }
+
+  /** Decode bytes as UTF-16 LE, stopping at the first 0x00 0x00 pair or unmapped slot */
+  function decodeUtf16String(b) {
+    const buf = [];
+    for (let i = 0; i + 1 < b.length; i += 2) {
+      const lo = b[i], hi = b[i + 1];
+      if (lo === null || hi === null) break;
+      if (lo === 0 && hi === 0) break;
+      buf.push(lo, hi);
+    }
+    if (buf.length === 0) return '(empty)';
+    return new TextDecoder('utf-16le', { fatal: false }).decode(new Uint8Array(buf));
+  }
+
   const bytes = $derived(getBytesAt(records, address, 8));
 
   const hexBytes = $derived(
@@ -54,7 +75,19 @@
     const v4 = makeView(b, 4);
     const v8 = makeView(b, 8);
     const na = '—';
-    return [
+
+    const hasNullByte = b.some(x => x === 0);
+    const hasTwoContiguousZeros = b.some((x, i) => x === 0 && i + 1 < b.length && b[i + 1] === 0);
+
+    const result = [];
+    if (hasNullByte) {
+      result.push({ group: 'String' });
+      result.push({ label: 'UTF-8',    value: decodeUtf8String(b),  str: true });
+      if (hasTwoContiguousZeros) {
+        result.push({ label: 'UTF-16 LE', value: decodeUtf16String(b), str: true });
+      }
+    }
+    result.push(
       { group: '8-bit' },
       { label: 'Uint8',     value: v1 ? v1.getUint8(0).toString()              : na },
       { label: 'Int8',      value: v1 ? v1.getInt8(0).toString()               : na },
@@ -77,7 +110,8 @@
       { label: 'Int64 BE',  value: v8 ? v8.getBigInt64(0, false).toString()    : na },
       { label: 'Float64 LE',value: v8 ? fmtF(v8.getFloat64(0, true))           : na },
       { label: 'Float64 BE',value: v8 ? fmtF(v8.getFloat64(0, false))          : na },
-    ];
+    );
+    return result;
   })());
 
   function hex32(n) { return '0x' + n.toString(16).padStart(8, '0').toUpperCase(); }
@@ -108,7 +142,7 @@
       {:else}
         <div class="insp-row">
           <span class="insp-label">{row.label}</span>
-          <span class="insp-value" class:na={row.value === '—'}>{row.value}</span>
+          <span class="insp-value" class:na={row.value === '—'} class:str={row.str}>{row.value}</span>
         </div>
       {/if}
     {/each}
@@ -269,5 +303,10 @@
 
   .insp-value.na {
     color: var(--c-null-text);
+  }
+
+  .insp-value.str {
+    color: #ce9178; /* string literal colour — warm orange, same as VS Code */
+    font-style: italic;
   }
 </style>
