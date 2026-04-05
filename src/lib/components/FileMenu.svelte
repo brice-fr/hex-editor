@@ -2,7 +2,7 @@
 <!-- SPDX-FileCopyrightText: 2026 Brice LECOLE -->
 
 <script>
-  let { onOpen = () => {}, onSave = () => {}, onFind = () => {}, onGoto = () => {}, loading = false, saving = false, hasFile = false } = $props();
+  let { onOpen = () => {}, onSave = () => {}, onFind = () => {}, onGoto = () => {}, onCompare = () => {}, loading = false, saving = false, hasFile = false } = $props();
 </script>
 
 <div class="toolbar">
@@ -83,6 +83,30 @@
       <polyline points="7 10 12 15 17 10"/>
       <!-- Target line -->
       <line x1="3" y1="20" x2="21" y2="20"/>
+    </svg>
+  </button>
+
+  <div class="divider"></div>
+
+  <!-- Compare with… button -->
+  <button
+    class="icon-btn"
+    onclick={() => onCompare()}
+    disabled={!hasFile}
+    title="Compare with…"
+    aria-label="Compare with another file"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Split-view box -->
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <!-- Centre divider -->
+      <line x1="12" y1="4" x2="12" y2="20"/>
+      <!-- Left-side content lines -->
+      <line x1="5.5" y1="9"  x2="10" y2="9"/>
+      <line x1="5.5" y1="13" x2="10" y2="13"/>
+      <!-- Right-side content lines -->
+      <line x1="14" y1="9"  x2="18.5" y2="9"/>
+      <line x1="14" y1="13" x2="18.5" y2="13"/>
     </svg>
   </button>
 </div>

@@ -21,6 +21,7 @@
   import ImportBinaryDialog from '$lib/components/ImportBinaryDialog.svelte';
   import PreferencesDialog from '$lib/components/PreferencesDialog.svelte';
   import FileAssocDialog from '$lib/components/FileAssocDialog.svelte';
+  import CompareDialog  from '$lib/components/CompareDialog.svelte';
 
   // ── Persistent settings — read synchronously before first render ──────────
   const LS = 'hex-editor.';
@@ -39,6 +40,8 @@
   let showAbout        = $state(false);
   let isDragging       = $state(false);
   let showImportBinary = $state(false);
+  let showCompare      = $state(false);
+  let compareFile      = $state('');
   let pendingBinaryPath = $state('');
   let hexTopAddress    = $state(0);        // tracks topmost visible address in HexViewer
   let gotoTarget       = $state(null);     // { addr, seq } — seq ensures reactivity on repeat
@@ -70,6 +73,7 @@
   // References to native CheckMenuItems so we can sync their checked state
   let segmentListMenuItem   = null;
   let dataInspectorMenuItem = null;
+  let compareMenuItem       = null;
 
   // Keep native menu checkmarks in sync with state.
   // NOTE: the value must be read into a local variable BEFORE the ?. call —
@@ -77,6 +81,7 @@
   // null, so Svelte would never track the dependency otherwise.
   $effect(() => { const v = showSegmentList;   segmentListMenuItem?.setChecked(v); });
   $effect(() => { const v = showDataInspector; dataInspectorMenuItem?.setChecked(v); });
+  $effect(() => { const v = records.length > 0; compareMenuItem?.setEnabled(v); });
 
   // ── Data Inspector address — follows scroll unless pinned by a byte click ─
   let inspectorAddress = $state(0);
@@ -127,6 +132,34 @@
   function handleGotoOpen() {
     if (records.length === 0) return;
     showGoto = true;
+  }
+
+  function handleCompareOpen() {
+    if (records.length === 0) return;
+    compareFile = '';
+    showCompare = true;
+  }
+
+  async function handleCompare(refPath, cmpPath) {
+    showCompare = false;
+    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+    const label = `compare_${Date.now()}`;
+    // Estimate minimum width to show all hex columns without horizontal scrolling.
+    // Each byte cell is ~3ch wide; at 12px Cascadia Code 1ch ≈ 7.2px → ~22px per cell.
+    const cellPx    = 22;
+    const bpr       = bytesPerRow;
+    const hexSideW  = bpr * cellPx + 8 + 8;   // bytes + mid-gap + side-padding
+    const centerW   = 2 + 90 + 2;              // v-sep + addr-col + v-sep
+    const outerPad  = 2 * 12;                  // container left+right padding
+    const w = Math.max(700, 2 * hexSideW + centerW + outerPad + 40);
+    new WebviewWindow(label, {
+      url: `compare?ref=${encodeURIComponent(refPath)}&cmp=${encodeURIComponent(cmpPath)}`,
+      title: `Compare — ${refPath.split('/').at(-1)} ↔ ${cmpPath.split('/').at(-1)}`,
+      width: w,
+      height: 800,
+      minWidth: w,
+      minHeight: 400,
+    });
   }
 
   function handleGotoConfirm(addr) {
@@ -363,6 +396,8 @@
               await MenuItem.new({ id: 'save-as', text: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', action: handleSave }),
               await MenuItem.new({ id: 'import-binary', text: 'Import Binary…', accelerator: 'CmdOrCtrl+B', action: handleImportBinaryOpen }),
               await PredefinedMenuItem.new({ item: 'Separator' }),
+              (compareMenuItem = await MenuItem.new({ id: 'compare', text: 'Compare with…', enabled: false, action: handleCompareOpen })),
+              await PredefinedMenuItem.new({ item: 'Separator' }),
               await PredefinedMenuItem.new({ item: 'CloseWindow' }),
             ],
           }),
@@ -419,7 +454,10 @@
         if (event.payload.type === 'drop') {
           isDragging = false;
           const paths = event.payload.paths;
-          if (paths.length > 0) handleOpenPath(paths[0]);
+          if (paths.length > 0) {
+            if (showCompare) compareFile = paths[0];
+            else handleOpenPath(paths[0]);
+          }
         } else if (event.payload.type === 'enter') {
           isDragging = true;
         } else if (event.payload.type === 'leave') {
@@ -501,6 +539,15 @@
 
 <FileAssocDialog open={showFileAssoc} onClose={() => { showFileAssoc = false; }} />
 
+<CompareDialog
+  open={showCompare}
+  referenceFile={currentFile}
+  bind:comparedFile={compareFile}
+  {isDragging}
+  onCompare={handleCompare}
+  onCancel={() => { showCompare = false; }}
+/>
+
 {#if isDragging}
   <div class="drop-overlay">
     <div class="drop-card">
@@ -519,7 +566,7 @@
 
 <div class="app-shell" onclick={() => { if (!loading && !saving) status = ''; }}>
   <!-- Toolbar: open + save icons -->
-  <FileMenu onOpen={handleOpen} onSave={handleSave} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
+  <FileMenu onOpen={handleOpen} onSave={handleSave} onFind={handleFindOpen} onGoto={handleGotoOpen} onCompare={handleCompareOpen} {loading} {saving} hasFile={records.length > 0} />
 
   <div class="content-area">
     <main class="viewer-area">
@@ -577,118 +624,6 @@
 </div>
 
 <style>
-  :global(:root) {
-    --c-bg:        #1e1e1e;
-    --c-surface:   #252526;
-    --c-raised:    #2d2d2d;
-    --c-hover:     #3c3c3c;
-    --c-border:    #3a3a3a;
-    --c-border2:   #454545;
-    --c-text:      #e0e0e0;
-    --c-text2:     #ccc;
-    --c-muted:     #888;
-    --c-dim:       #555;
-    --c-accent:    #007acc;
-    --c-accent-t:  #9cdcfe;
-    --c-accent-b:  #0e639c;
-    --c-accent-h:  #1177bb;
-    --c-accent-bg: rgba(0,122,204,0.15);
-    --c-err:       #f47171;
-    --c-err-bg:    rgba(244,71,71,0.15);
-    --c-gap-bg:    #1a1a1a;
-    --c-gap-text:  #555;
-    --c-addr:      #569cd6;
-    --c-null:      #3a3a3a;
-    --c-null-text: #3a3a3a;
-    --c-ec0:       transparent;
-    --c-ec1:       rgba(255,255,255,0.03);
-    --c-header-bg: #1e1e1e;
-    --c-sel:       rgba(58,110,165,0.60);
-    --c-sel-text:  #ffffff;
-    --c-scrollbar-thumb:  #000000;
-    --c-scrollbar-track:  #2d2d2d;
-  }
-
-  @media (prefers-color-scheme: light) {
-    :global(:root:not([data-theme="dark"])) {
-      --c-bg:        #ffffff;
-      --c-surface:   #f8f8f8;
-      --c-raised:    #f0f0f0;
-      --c-hover:     #e8e8e8;
-      --c-border:    #e0e0e0;
-      --c-border2:   #d4d4d4;
-      --c-text:      #1e1e1e;
-      --c-text2:     #444;
-      --c-muted:     #666;
-      --c-dim:       #999;
-      --c-accent:    #0070c1;
-      --c-accent-t:  #0070c1;
-      --c-accent-b:  #0e639c;
-      --c-accent-h:  #0080d4;
-      --c-accent-bg: rgba(0,112,193,0.10);
-      --c-err:       #d32f2f;
-      --c-err-bg:    rgba(211,47,47,0.10);
-      --c-gap-bg:    #f0f0f0;
-      --c-gap-text:  #aaa;
-      --c-addr:      #0451a5;
-      --c-null:      #e8e8e8;
-      --c-null-text: #e8e8e8;
-      --c-ec0:       transparent;
-      --c-ec1:       rgba(0,0,0,0.03);
-      --c-header-bg: #f3f3f3;
-      --c-sel:       rgba(0,95,204,0.22);
-      --c-sel-text:  #1a1a1a;
-      --c-scrollbar-thumb:  #777777;
-      --c-scrollbar-track:  #d4d4d4;
-    }
-  }
-
-  :global(:root[data-theme="light"]) {
-    --c-bg:        #ffffff;
-    --c-surface:   #f8f8f8;
-    --c-raised:    #f0f0f0;
-    --c-hover:     #e8e8e8;
-    --c-border:    #e0e0e0;
-    --c-border2:   #d4d4d4;
-    --c-text:      #1e1e1e;
-    --c-text2:     #444;
-    --c-muted:     #666;
-    --c-dim:       #999;
-    --c-accent:    #0070c1;
-    --c-accent-t:  #0070c1;
-    --c-accent-b:  #0e639c;
-    --c-accent-h:  #0080d4;
-    --c-accent-bg: rgba(0,112,193,0.10);
-    --c-err:       #d32f2f;
-    --c-err-bg:    rgba(211,47,47,0.10);
-    --c-gap-bg:    #f0f0f0;
-    --c-gap-text:  #aaa;
-    --c-addr:      #0451a5;
-    --c-null:      #e8e8e8;
-    --c-null-text: #e8e8e8;
-    --c-ec0:       transparent;
-    --c-ec1:       rgba(0,0,0,0.03);
-    --c-header-bg: #f3f3f3;
-    --c-sel:       rgba(0,95,204,0.22);
-    --c-sel-text:  #1a1a1a;
-  }
-
-  :global(*, *::before, *::after) {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  :global(body) {
-    background: var(--c-bg);
-    color: var(--c-text);
-    overflow: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-                 'Helvetica Neue', Arial, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'tnum';
-    -webkit-font-smoothing: antialiased;
-  }
-
   .app-shell {
     display: flex;
     flex-direction: column;
