@@ -3,7 +3,7 @@
 
 <script>
   import { onMount } from 'svelte';
-  import { openFile, detectFileFormat, parseIntelHex, parseSrec } from '$lib/api.js';
+  import { parseFile } from '$lib/api.js';
   import DiffViewer from '$lib/components/DiffViewer.svelte';
 
   let refPath  = $state('');
@@ -12,21 +12,6 @@
   let cmpRecords = $state([]);
   let loading  = $state(true);
   let error    = $state('');
-
-  async function loadFile(path) {
-    const bytes  = await openFile(path);
-    const fmt    = await detectFileFormat(path);
-    if (fmt === 'ihex') {
-      const json = await parseIntelHex(bytes);
-      return JSON.parse(json).records;
-    }
-    if (fmt === 'srec') {
-      const json = await parseSrec(bytes);
-      return JSON.parse(json).records;
-    }
-    // Binary — treat as a single data record at address 0
-    return [{ record_type: 'Data', address: 0, data: bytes }];
-  }
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -40,7 +25,7 @@
     }
 
     try {
-      [refRecords, cmpRecords] = await Promise.all([loadFile(refPath), loadFile(cmpPath)]);
+      [refRecords, cmpRecords] = await Promise.all([parseFile(refPath), parseFile(cmpPath)]);
     } catch (e) {
       error = String(e);
     } finally {

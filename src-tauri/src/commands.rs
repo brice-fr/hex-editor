@@ -37,6 +37,42 @@ pub fn detect_file_format(path: String) -> String {
     file_operations::detect_format(&path)
 }
 
+/// Read and parse a file in a single Tauri call, returning a JSON string of
+/// records (same shape as `parse_intel_hex` / `parse_srec`).
+///
+/// Binary files are wrapped as a single Data record at address 0.
+/// This eliminates the double IPC round-trip of `open_file` + `parse_*`:
+/// for a 256 KB IHex file the round-trip transfers ~9 MB; this sends ~1 MB.
+#[tauri::command]
+pub fn parse_file(path: String) -> Result<String, String> {
+    match file_operations::detect_format(&path).as_str() {
+        "ihex" => {
+            let text = file_operations::read_text_file(&path)?;
+            let hf   = hex_parser::parse(&text)?;
+            serde_json::to_string(&hf).map_err(|e| format!("serialization error: {e}"))
+        }
+        "srec" => {
+            let text = file_operations::read_text_file(&path)?;
+            let sf   = srec_parser::parse(&text)?;
+            serde_json::to_string(&sf).map_err(|e| format!("serialization error: {e}"))
+        }
+        _ => {
+            // Binary: wrap raw bytes as a single Data record at address 0
+            let data = file_operations::read_file(&path)?;
+            let wrapped = serde_json::json!({
+                "records": [{ "record_type": "Data", "address": 0u32, "data": data }]
+            });
+            serde_json::to_string(&wrapped).map_err(|e| format!("serialization error: {e}"))
+        }
+    }
+}
+
+/// Write a UTF-8 text string to a file (used by the HTML diff-report exporter).
+#[tauri::command]
+pub fn write_text_file(path: String, content: String) -> Result<(), String> {
+    file_operations::write_file(&path, content.as_bytes())
+}
+
 /// Flatten records into a raw binary blob and write to disk.
 /// Returns the number of bytes written.
 #[tauri::command]
