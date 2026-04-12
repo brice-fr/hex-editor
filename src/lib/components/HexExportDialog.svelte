@@ -27,6 +27,7 @@
 
   let showAscii   = $state(true);
   let showPath    = $state(false);
+  let exportBpr   = $state(bytesPerRow);
   let exporting   = $state(false);
   let exportError = $state('');
 
@@ -35,6 +36,7 @@
     if (open) {
       exportError = '';
       exporting   = false;
+      exportBpr   = bytesPerRow;
     }
   });
 
@@ -52,7 +54,7 @@
       });
       if (!path) { exporting = false; return; }
 
-      const html = generateHexHtml({ records, bytesPerRow, currentFile, showAscii, showPath, currentFormat });
+      const html = generateHexHtml({ records, bytesPerRow: exportBpr, currentFile, showAscii, showPath, currentFormat });
       await writeTextFile(path, html);
       onClose();
     } catch (e) {
@@ -95,6 +97,18 @@
         <input type="checkbox" bind:checked={showPath}>
         Show full file path in report
       </label>
+
+      <div class="field-row">
+        <span class="field-label">Columns</span>
+        <div class="bpr-group">
+          {#each [8, 16, 32] as n}
+            <label class="bpr-option" class:selected={exportBpr === n}>
+              <input type="radio" name="export-bpr" value={n} bind:group={exportBpr}>
+              {n}
+            </label>
+          {/each}
+        </div>
+      </div>
 
       {#if exportError}
         <p class="error-msg">{exportError}</p>
@@ -156,6 +170,53 @@
     color: var(--c-text);
     cursor: pointer;
     padding: 3px 0;
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 0;
+  }
+
+  .field-label {
+    font-size: 13px;
+    color: var(--c-text);
+    flex-shrink: 0;
+  }
+
+  .bpr-group {
+    display: flex;
+    gap: 4px;
+  }
+
+  .bpr-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 24px;
+    border: 1px solid var(--c-dim);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+  }
+
+  .bpr-option input[type="radio"] {
+    display: none;
+  }
+
+  .bpr-option:hover {
+    background: var(--c-hover);
+    color: var(--c-text);
+  }
+
+  .bpr-option.selected {
+    background: var(--c-accent-b);
+    border-color: var(--c-accent-b);
+    color: #fff;
   }
 
   .error-msg {
