@@ -332,6 +332,58 @@
   }
 
   $effect(() => () => stopScrollBtn());
+
+  // ── Copy context menu ─────────────────────────────────────────────────────
+  let ctxMenu = $state(/** @type {{ x: number; y: number; previews: string[] } | null} */ (null));
+
+  /** Extract the selected bytes from records into a Uint8Array. */
+  function getSelectedBytes() {
+    if (selMin === null || selMax === null) return new Uint8Array(0);
+    const len = selMax - selMin + 1;
+    const buf = new Uint8Array(len);
+    for (const rec of records) {
+      const isData = rec.record_type === 'Data' || rec.record_type === 'S1'
+                  || rec.record_type === 'S2'   || rec.record_type === 'S3';
+      if (!isData || !rec.data.length) continue;
+      const rEnd = rec.address + rec.data.length - 1;
+      if (rEnd < selMin || rec.address > selMax) continue;
+      const from = Math.max(rec.address, selMin);
+      const to   = Math.min(rEnd, selMax);
+      for (let a = from; a <= to; a++) buf[a - selMin] = rec.data[a - rec.address];
+    }
+    return buf;
+  }
+
+  const COPY_FORMATS = [
+    { label: 'Hex string (spaced)',  fn: (b) => Array.from(b).map(v => v.toString(16).padStart(2,'0').toUpperCase()).join(' ') },
+    { label: 'Hex string',           fn: (b) => Array.from(b).map(v => v.toString(16).padStart(2,'0').toUpperCase()).join('') },
+    { label: 'C array',              fn: (b) => '{ ' + Array.from(b).map(v => '0x' + v.toString(16).padStart(2,'0').toUpperCase()).join(', ') + ' }' },
+    { label: 'Python bytes',         fn: (b) => "b'" + Array.from(b).map(v => '\\x' + v.toString(16).padStart(2,'0')).join('') + "'" },
+    { label: 'Base64',               fn: (b) => { let s = ''; for (const v of b) s += String.fromCharCode(v); return btoa(s); } },
+    { label: 'ASCII / UTF-8 string', fn: (b) => Array.from(b).map(v => v >= 0x20 && v < 0x7f ? String.fromCharCode(v) : '·').join('') },
+  ];
+
+  function onContextMenu(e) {
+    if (selMin === null) return;
+    const byteEl = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-addr]');
+    if (!byteEl) { ctxMenu = null; return; }
+    const addr = parseInt(/** @type {HTMLElement} */ (byteEl).dataset.addr ?? '');
+    if (isNaN(addr) || addr < selMin || addr > selMax) { ctxMenu = null; return; }
+    e.preventDefault();
+    const buf = getSelectedBytes();
+    const previews = COPY_FORMATS.map(f => { const s = f.fn(buf); return s.length > 32 ? s.slice(0, 29) + '…' : s; });
+    // Adjust so the menu doesn't overflow off screen
+    const menuW = 310, menuH = COPY_FORMATS.length * 36 + 32;
+    const x = e.clientX + menuW > window.innerWidth  ? e.clientX - menuW : e.clientX;
+    const y = e.clientY + menuH > window.innerHeight ? e.clientY - menuH : e.clientY;
+    ctxMenu = { x, y, previews };
+  }
+
+  async function copyAs(fmt) {
+    const buf = getSelectedBytes();
+    try { await navigator.clipboard.writeText(fmt.fn(buf)); } catch { /* clipboard unavailable */ }
+    ctxMenu = null;
+  }
 </script>
 
 <div class="hex-viewer" style="font-size:{fontSize}px">
@@ -374,6 +426,7 @@
           onpointerdown={onScrollPointerDown}
           onpointermove={onScrollPointerMove}
           onpointerup={onScrollPointerUp}
+          oncontextmenu={onContextMenu}
           bind:clientHeight
           bind:this={scrollEl}
         >
@@ -482,6 +535,30 @@
 
   {/if}
 </div>
+
+<!-- ── Copy context menu (fixed, portal-like) ── -->
+<svelte:window
+  onclick={(e) => { if (ctxMenu && !/** @type {Element} */ (e.target)?.closest('.ctx-menu')) ctxMenu = null; }}
+  onkeydown={(e) => { if (e.key === 'Escape') ctxMenu = null; }}
+/>
+
+{#if ctxMenu}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="ctx-menu"
+    style="left:{ctxMenu.x}px; top:{ctxMenu.y}px;"
+    oncontextmenu={(e) => e.preventDefault()}
+  >
+    <div class="ctx-header">Copy {selCount} byte{selCount === 1 ? '' : 's'} as…</div>
+    {#each COPY_FORMATS as fmt, i}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="ctx-item" onclick={() => copyAs(fmt)}>
+        <span class="ctx-label">{fmt.label}</span>
+        <span class="ctx-preview">{ctxMenu.previews[i]}</span>
+      </div>
+    {/each}
+  </div>
+{/if}
 
 <style>
   .hex-viewer {
@@ -769,5 +846,62 @@
     color: var(--c-dim);
     text-align: center;
     margin-top: 4rem;
+  }
+
+  /* ── Copy context menu ── */
+  :global(.ctx-menu) {
+    position: fixed;
+    z-index: 9999;
+    min-width: 310px;
+    background: var(--c-surface, #252526);
+    border: 1px solid var(--c-border, #3c3c3c);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    padding: 4px 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 12px;
+    user-select: none;
+  }
+
+  :global(.ctx-header) {
+    padding: 6px 12px 5px;
+    font-size: 11px;
+    color: var(--c-muted, #858585);
+    border-bottom: 1px solid var(--c-border, #3c3c3c);
+    margin-bottom: 3px;
+  }
+
+  :global(.ctx-item) {
+    display: flex;
+    flex-direction: column;
+    padding: 5px 12px;
+    cursor: pointer;
+    gap: 1px;
+  }
+
+  :global(.ctx-item:hover) {
+    background: var(--c-hover, rgba(255,255,255,0.07));
+  }
+
+  :global(.ctx-label) {
+    color: var(--c-text, #d4d4d4);
+    font-size: 12px;
+  }
+
+  :global(.ctx-preview) {
+    color: var(--c-muted, #858585);
+    font-family: 'Cascadia Code', 'SF Mono', 'Fira Code', monospace;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :global(.ctx-menu)   { background: #fff; border-color: #ddd; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+    :global(.ctx-header) { color: #888; border-color: #e8e8e8; }
+    :global(.ctx-label)  { color: #1e1e1e; }
+    :global(.ctx-preview){ color: #888; }
+    :global(.ctx-item:hover) { background: #f0f0f0; }
   }
 </style>
