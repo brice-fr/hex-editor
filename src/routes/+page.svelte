@@ -533,7 +533,7 @@
 
 <div class="app-shell" onclick={() => { if (!loading && !saving) status = ''; }}>
   <!-- Toolbar: open + save icons -->
-  <FileMenu onOpen={handleOpen} onSave={handleSave} onExport={() => showExportHtml = true} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
+  <FileMenu onOpen={handleOpen} onSave={handleSave} onExport={() => showExportHtml = true} onFind={handleFindOpen} onGoto={handleGotoOpen} onSettings={() => showPreferences = true} {loading} {saving} hasFile={records.length > 0} />
 
   <div class="content-area">
     <main class="viewer-area">
