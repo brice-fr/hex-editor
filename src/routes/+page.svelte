@@ -147,7 +147,7 @@
     // Estimate minimum width to show all hex columns without horizontal scrolling.
     // Each byte cell is ~3ch wide; at 12px Cascadia Code 1ch ≈ 7.2px → ~22px per cell.
     const cellPx    = 22;
-    const bpr       = bytesPerRow;
+    const bpr       = 16;   // diff viewer always renders 16 bytes per row
     const hexSideW  = bpr * cellPx + 8 + 8;   // bytes + mid-gap + side-padding
     const centerW   = 2 + 90 + 2;              // v-sep + addr-col + v-sep
     const outerPad  = 2 * 12;                  // container left+right padding
