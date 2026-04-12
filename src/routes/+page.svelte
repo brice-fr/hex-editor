@@ -15,6 +15,7 @@
   import SegmentList   from '$lib/components/SegmentList.svelte';
   import DataInspector from '$lib/components/DataInspector.svelte';
   import SaveFormatDialog from '$lib/components/SaveFormatDialog.svelte';
+  import HexExportDialog from '$lib/components/HexExportDialog.svelte';
   import GoToDialog  from '$lib/components/GoToDialog.svelte';
   import FindDialog  from '$lib/components/FindDialog.svelte';
   import AboutDialog from '$lib/components/AboutDialog.svelte';
@@ -33,7 +34,8 @@
   let status        = $state('');
   let loading       = $state(false);
   let saving           = $state(false);
-  let showFormatPicker = $state(false);
+  let showFormatPicker  = $state(false);
+  let showExportHtml    = $state(false);
   let showGoto         = $state(false);
   let showFind         = $state(false);
   let showAbout        = $state(false);
@@ -70,6 +72,7 @@
   // References to native CheckMenuItems so we can sync their checked state
   let segmentListMenuItem   = null;
   let dataInspectorMenuItem = null;
+  let exportHtmlMenuItem    = null;
 
   // Keep native menu checkmarks in sync with state.
   // NOTE: the value must be read into a local variable BEFORE the ?. call —
@@ -77,6 +80,7 @@
   // null, so Svelte would never track the dependency otherwise.
   $effect(() => { const v = showSegmentList;   segmentListMenuItem?.setChecked(v); });
   $effect(() => { const v = showDataInspector; dataInspectorMenuItem?.setChecked(v); });
+  $effect(() => { const v = records.length > 0; exportHtmlMenuItem?.setEnabled(v); });
 
   // ── Data Inspector address — follows scroll unless pinned by a byte click ─
   let inspectorAddress = $state(0);
@@ -361,6 +365,7 @@
             items: [
               await MenuItem.new({ id: 'open', text: 'Open…', accelerator: 'CmdOrCtrl+O', action: handleOpen }),
               await MenuItem.new({ id: 'save-as', text: 'Save as…', accelerator: 'CmdOrCtrl+Shift+S', action: handleSave }),
+              (exportHtmlMenuItem = await MenuItem.new({ id: 'export-html', text: 'Export as HTML…', enabled: false, action: () => (showExportHtml = true) })),
               await MenuItem.new({ id: 'import-binary', text: 'Import Binary…', accelerator: 'CmdOrCtrl+B', action: handleImportBinaryOpen }),
               await PredefinedMenuItem.new({ item: 'Separator' }),
               await PredefinedMenuItem.new({ item: 'CloseWindow' }),
@@ -501,6 +506,15 @@
 
 <FileAssocDialog open={showFileAssoc} onClose={() => { showFileAssoc = false; }} />
 
+<HexExportDialog
+  open={showExportHtml}
+  {records}
+  {bytesPerRow}
+  currentFile={currentFile}
+  currentFormat={currentFormat}
+  onClose={() => showExportHtml = false}
+/>
+
 {#if isDragging}
   <div class="drop-overlay">
     <div class="drop-card">
@@ -519,7 +533,7 @@
 
 <div class="app-shell" onclick={() => { if (!loading && !saving) status = ''; }}>
   <!-- Toolbar: open + save icons -->
-  <FileMenu onOpen={handleOpen} onSave={handleSave} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
+  <FileMenu onOpen={handleOpen} onSave={handleSave} onExport={() => showExportHtml = true} onFind={handleFindOpen} onGoto={handleGotoOpen} {loading} {saving} hasFile={records.length > 0} />
 
   <div class="content-area">
     <main class="viewer-area">
