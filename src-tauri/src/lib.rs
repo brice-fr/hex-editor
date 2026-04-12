@@ -39,6 +39,7 @@ pub fn run() {
             commands::get_file_associations,
             commands::apply_file_associations,
             commands::get_startup_file,
+            commands::write_text_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

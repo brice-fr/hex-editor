@@ -78,3 +78,8 @@ pub async fn apply_file_associations(
 ) -> Result<(), String> {
     crate::file_assoc::apply_associations(&changes)
 }
+
+#[tauri::command]
+pub fn write_text_file(path: String, content: String) -> Result<(), String> {
+    file_operations::write_file(&path, content.as_bytes())
+}

@@ -81,6 +81,16 @@ export async function getFileAssociations() {
   return await invoke('get_file_associations');
 }
 
+/**
+ * Write a UTF-8 text string to disk.
+ * @param {string} path     Absolute destination path.
+ * @param {string} content  Text content to write.
+ * @returns {Promise<void>}
+ */
+export async function writeTextFile(path, content) {
+  return invoke('write_text_file', { path, content });
+}
+
 export async function applyFileAssociations(changes) {
   return await invoke('apply_file_associations', { changes });
 }
