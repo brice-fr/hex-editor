@@ -354,14 +354,19 @@
     return buf;
   }
 
-  const COPY_FORMATS = [
+  const ALL_COPY_FORMATS = [
     { label: 'Hex string (spaced)',  fn: (b) => Array.from(b).map(v => v.toString(16).padStart(2,'0').toUpperCase()).join(' ') },
     { label: 'Hex string',           fn: (b) => Array.from(b).map(v => v.toString(16).padStart(2,'0').toUpperCase()).join('') },
     { label: 'C array',              fn: (b) => '{ ' + Array.from(b).map(v => '0x' + v.toString(16).padStart(2,'0').toUpperCase()).join(', ') + ' }' },
     { label: 'Python bytes',         fn: (b) => "b'" + Array.from(b).map(v => '\\x' + v.toString(16).padStart(2,'0')).join('') + "'" },
     { label: 'Base64',               fn: (b) => { let s = ''; for (const v of b) s += String.fromCharCode(v); return btoa(s); } },
     { label: 'ASCII / UTF-8 string', fn: (b) => Array.from(b).map(v => v >= 0x20 && v < 0x7f ? String.fromCharCode(v) : '·').join('') },
+    { label: 'UTF-16 LE string',     fn: (b) => new TextDecoder('utf-16le').decode(b), even: true },
+    { label: 'UTF-16 BE string',     fn: (b) => new TextDecoder('utf-16be').decode(b), even: true },
   ];
+
+  // Only include UTF-16 entries when the selection has an even byte count
+  const activeCopyFormats = $derived(ALL_COPY_FORMATS.filter(f => !f.even || selCount % 2 === 0));
 
   function onContextMenu(e) {
     if (selMin === null) return;
@@ -371,9 +376,10 @@
     if (isNaN(addr) || addr < selMin || addr > selMax) { ctxMenu = null; return; }
     e.preventDefault();
     const buf = getSelectedBytes();
-    const previews = COPY_FORMATS.map(f => { const s = f.fn(buf); return s.length > 32 ? s.slice(0, 29) + '…' : s; });
+    const formats = activeCopyFormats;
+    const previews = formats.map(f => { const s = f.fn(buf); return s.length > 32 ? s.slice(0, 29) + '…' : s; });
     // Adjust so the menu doesn't overflow off screen
-    const menuW = 310, menuH = COPY_FORMATS.length * 36 + 32;
+    const menuW = 310, menuH = formats.length * 36 + 32;
     const x = e.clientX + menuW > window.innerWidth  ? e.clientX - menuW : e.clientX;
     const y = e.clientY + menuH > window.innerHeight ? e.clientY - menuH : e.clientY;
     ctxMenu = { x, y, previews };
@@ -550,7 +556,7 @@
     oncontextmenu={(e) => e.preventDefault()}
   >
     <div class="ctx-header">Copy {selCount} byte{selCount === 1 ? '' : 's'} as…</div>
-    {#each COPY_FORMATS as fmt, i}
+    {#each activeCopyFormats as fmt, i}
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="ctx-item" onclick={() => copyAs(fmt)}>
         <span class="ctx-label">{fmt.label}</span>
