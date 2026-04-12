@@ -387,7 +387,8 @@
 
   async function copyAs(fmt) {
     const buf = getSelectedBytes();
-    try { await navigator.clipboard.writeText(fmt.fn(buf)); } catch { /* clipboard unavailable */ }
+    const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+    try { await writeText(fmt.fn(buf)); } catch { /* clipboard unavailable */ }
     ctxMenu = null;
   }
 </script>
