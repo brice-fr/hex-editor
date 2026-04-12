@@ -83,3 +83,14 @@ pub async fn apply_file_associations(
 pub fn write_text_file(path: String, content: String) -> Result<(), String> {
     file_operations::write_file(&path, content.as_bytes())
 }
+
+/// Write plain text to the system clipboard via arboard, which sets only
+/// NSPasteboardTypeString on macOS — no RTF/HTML side-car types that the
+/// WRY/WebView clipboard abstraction may add.
+#[tauri::command]
+pub fn copy_plain_text(text: String) -> Result<(), String> {
+    arboard::Clipboard::new()
+        .map_err(|e| e.to_string())?
+        .set_text(text)
+        .map_err(|e| e.to_string())
+}
