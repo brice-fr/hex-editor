@@ -20,6 +20,18 @@ export async function openFile(path) {
 }
 
 /**
+ * Read and parse a file in a single IPC call, returning its records array.
+ * Replaces `openFile` + `parseIntelHex`/`parseSrec` for the diff viewer:
+ * eliminates the round-trip that serialises raw file bytes through JS.
+ * @param {string} path  Absolute path to the file.
+ * @returns {Promise<Array>}  Parsed records array.
+ */
+export async function parseFile(path) {
+  const json = await invoke('parse_file', { path });
+  return JSON.parse(json).records;
+}
+
+/**
  * Parse an Intel HEX payload.
  * @param {number[]} data  Raw bytes (from openFile).
  * @returns {Promise<string>}  JSON string of HexFile structure.
@@ -75,6 +87,16 @@ export async function saveBinary(records, path, fillByte) {
  */
 export async function getStartupFile() {
   return invoke('get_startup_file');
+}
+
+/**
+ * Write a UTF-8 text file to disk (used by the HTML diff-report exporter).
+ * @param {string} path     Absolute destination path.
+ * @param {string} content  Text content to write.
+ * @returns {Promise<void>}
+ */
+export async function writeTextFile(path, content) {
+  return invoke('write_text_file', { path, content });
 }
 
 export async function getFileAssociations() {

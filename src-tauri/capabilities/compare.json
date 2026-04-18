@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "compare",
+  "description": "Capability for compare diff windows",
+  "windows": ["compare_*"],
+  "permissions": [
+    "core:default",
+    "dialog:default"
+  ]
+}

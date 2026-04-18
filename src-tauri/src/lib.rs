@@ -32,15 +32,16 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             commands::open_file,
+            commands::parse_file,
             commands::parse_intel_hex,
             commands::parse_srec,
             commands::detect_file_format,
             commands::save_file,
+            commands::write_text_file,
             commands::save_binary,
             commands::get_file_associations,
             commands::apply_file_associations,
             commands::get_startup_file,
-            commands::write_text_file,
             commands::copy_plain_text,
         ])
         .build(tauri::generate_context!())
