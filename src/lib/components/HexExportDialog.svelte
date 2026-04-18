@@ -27,7 +27,7 @@
 
   let showAscii   = $state(true);
   let showPath    = $state(false);
-  let exportBpr   = $state(bytesPerRow);
+  let exportBpr   = $state(16);
   let exporting   = $state(false);
   let exportError = $state('');
 
