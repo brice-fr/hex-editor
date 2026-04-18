@@ -481,7 +481,7 @@ ${showPaths ? `<div class="file-paths">
 
   function hex8(n) { return n.toString(16).padStart(8, '0').toUpperCase(); }
   function hex2(n) { return n.toString(16).padStart(2, '0').toUpperCase(); }
-  function lastName(path) { return path ? path.split('/').at(-1) : '—'; }
+  function lastName(path) { return path ? path.split(/[\\/]/).at(-1) : '—'; }
 
   function itemKey(item) {
     if (item.type === 'gap')      return `gap-${item.addr}`;
